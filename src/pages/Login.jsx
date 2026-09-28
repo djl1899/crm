@@ -1,0 +1,78 @@
+import { useState } from 'react';
+import { useAuth } from '../lib/auth.jsx';
+import { Button, Field } from '../components/ui.jsx';
+import { Icon } from '../components/Icon.jsx';
+
+export function LoginPage() {
+  const auth = useAuth();
+  const [values, setValues] = useState({ name: '', email: '', password: '', password2: '', demo: true });
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const set = (k) => (e) => setValues((v) => ({ ...v, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
+  const setup = auth.needsSetup;
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    if (setup && values.password !== values.password2) return setError('Die Passwörter stimmen nicht überein.');
+    setBusy(true);
+    try {
+      if (setup) await auth.setup({ name: values.name, email: values.email, password: values.password, demo: values.demo });
+      else await auth.login(values.email, values.password);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="auth-page">
+      <div className="auth-card">
+        <div className="auth-brand">
+          <span className="brand-mark">C</span>
+          <span className="brand-name">Creator CRM</span>
+        </div>
+        <h1>{setup ? 'Ersteinrichtung' : 'Anmelden'}</h1>
+        <p className="muted">
+          {setup
+            ? 'Lege das erste Konto an. Es erhält Administrator-Rechte und kann weitere Benutzer hinzufügen.'
+            : 'Melde dich mit deinem Konto an.'}
+        </p>
+        <form onSubmit={submit} className="stack">
+          {setup && (
+            <Field label="Name" required>
+              <input className="input" value={values.name} onChange={set('name')} required autoFocus autoComplete="name" />
+            </Field>
+          )}
+          <Field label="E-Mail" required>
+            <input className="input" type="email" value={values.email} onChange={set('email')} required autoFocus={!setup} autoComplete="email" />
+          </Field>
+          <Field label="Passwort" required hint={setup ? 'Mindestens 8 Zeichen.' : undefined}>
+            <input className="input" type="password" value={values.password} onChange={set('password')} required minLength={setup ? 8 : undefined} autoComplete={setup ? 'new-password' : 'current-password'} />
+          </Field>
+          {setup && (
+            <>
+              <Field label="Passwort wiederholen" required>
+                <input className="input" type="password" value={values.password2} onChange={set('password2')} required autoComplete="new-password" />
+              </Field>
+              <label className="checkbox">
+                <input type="checkbox" checked={values.demo} onChange={set('demo')} />
+                <span>Demo-Daten laden (13 fiktive Creator mit Kooperationen, Aufgaben & Outreach)</span>
+              </label>
+            </>
+          )}
+          {error && (
+            <div className="alert alert-error">
+              <Icon name="alert" size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+          <Button variant="primary" type="submit" loading={busy} className="btn-block">
+            {setup ? 'Konto anlegen & starten' : 'Anmelden'}
+          </Button>
+        </form>
+      </div>
+    </div>
+  );
+}
