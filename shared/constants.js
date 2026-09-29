@@ -51,6 +51,11 @@ export const ACTIVE_COLLAB_STATUSES = ['Aktiv', 'Content ausstehend', 'Abnahme']
 // Kooperationen, deren Vergütung als Umsatz zählt (bestätigte Deals)
 export const REVENUE_COLLAB_STATUSES = ['Geplant', 'Aktiv', 'Content ausstehend', 'Abnahme', 'Abgeschlossen'];
 
+export const EXPENSE_CATEGORIES = [
+  'Domain & Hosting', 'Software & Tools', 'Werbung & Marketing', 'Equipment', 'Reisekosten',
+  'Creator-Auszahlung', 'Büro & Verwaltung', 'Rechts- & Steuerberatung', 'Sonstiges',
+];
+
 export const INVOICE_STATUSES = ['Nicht erstellt', 'Offen', 'Eingereicht', 'Bezahlt', 'Überfällig'];
 
 export const TASK_STATUSES = ['Offen', 'In Bearbeitung', 'Wartet auf Creator', 'Erledigt', 'Abgebrochen'];
