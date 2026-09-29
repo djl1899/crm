@@ -12,6 +12,7 @@ import { TasksPage } from './pages/Tasks.jsx';
 import { OutreachPage } from './pages/Outreach.jsx';
 import { ContractsPage } from './pages/Contracts.jsx';
 import { FinancePage } from './pages/Finance.jsx';
+import { MediaPage } from './pages/Media.jsx';
 import { UsersPage } from './pages/Users.jsx';
 import { SettingsPage } from './pages/Settings.jsx';
 
@@ -26,6 +27,7 @@ const ROUTES = [
   ['/outreach', OutreachPage],
   ['/contracts', ContractsPage],
   ['/finance', FinancePage],
+  ['/media', MediaPage],
   ['/users', UsersPage],
   ['/settings', SettingsPage],
 ];
