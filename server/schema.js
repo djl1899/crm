@@ -194,6 +194,24 @@ const MIGRATIONS = [
     )`,
     `create index if not exists login_attempts_idx on login_attempts (lower(email), created_at desc)`,
   ],
+  // 2: Ausgaben
+  [
+    `create table if not exists expenses (
+      id serial primary key,
+      expense_date date not null,
+      title text not null,
+      category text not null default 'Sonstiges',
+      amount numeric(12,2) not null,
+      paid_by integer references users(id) on delete set null,
+      creator_id integer references creators(id) on delete set null,
+      notes text,
+      created_by integer references users(id) on delete set null,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )`,
+    `create index if not exists expenses_date_idx on expenses (expense_date desc)`,
+    `create index if not exists expenses_category_idx on expenses (category)`,
+  ],
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;
