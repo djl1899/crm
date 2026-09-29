@@ -56,6 +56,13 @@ export const EXPENSE_CATEGORIES = [
   'Creator-Auszahlung', 'Büro & Verwaltung', 'Rechts- & Steuerberatung', 'Sonstiges',
 ];
 
+// Media Produktion
+export const MEDIA_STATUSES = [
+  'Anfrage', 'Angebot gesendet', 'Gebucht', 'Dreh geplant', 'Gedreht', 'Schnitt', 'Feedback', 'Geliefert', 'Abgeschlossen', 'Abgebrochen',
+];
+export const MEDIA_CLOSED_STATUSES = ['Abgeschlossen', 'Abgebrochen'];
+export const MEDIA_TYPES = ['Social Media Content', 'Reel / TikTok', 'Imagefilm', 'Werbespot', 'Fotoshooting', 'Event', 'Hochzeit', 'Produktfotos', 'Sonstiges'];
+
 export const INVOICE_STATUSES = ['Nicht erstellt', 'Offen', 'Eingereicht', 'Bezahlt', 'Überfällig'];
 
 export const TASK_STATUSES = ['Offen', 'In Bearbeitung', 'Wartet auf Creator', 'Erledigt', 'Abgebrochen'];
