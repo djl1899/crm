@@ -212,6 +212,34 @@ const MIGRATIONS = [
     `create index if not exists expenses_date_idx on expenses (expense_date desc)`,
     `create index if not exists expenses_category_idx on expenses (category)`,
   ],
+  // 3: Media Produktion
+  [
+    `create table if not exists media_projects (
+      id serial primary key,
+      client_name text not null,
+      title text not null,
+      project_type text,
+      status text not null default 'Anfrage',
+      shoot_at timestamptz,
+      shoot_location text,
+      delivery_date date,
+      deliverables text,
+      price numeric(12,2) not null default 0,
+      invoice_status text not null default 'Nicht erstellt',
+      contact_name text,
+      contact_email text,
+      contact_phone text,
+      assignee_id integer references users(id) on delete set null,
+      creator_id integer references creators(id) on delete set null,
+      notes text,
+      created_by integer references users(id) on delete set null,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )`,
+    `create index if not exists media_status_idx on media_projects (status)`,
+    `create index if not exists media_shoot_idx on media_projects (shoot_at)`,
+    `create index if not exists media_delivery_idx on media_projects (delivery_date)`,
+  ],
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

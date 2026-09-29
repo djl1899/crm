@@ -13,6 +13,7 @@ import tagRoutes from './routes/tags.js';
 import dashboardRoutes from './routes/dashboard.js';
 import seedRoutes from './routes/seed.js';
 import expenseRoutes from './routes/expenses.js';
+import mediaRoutes from './routes/media.js';
 
 const routes = [];
 
@@ -31,7 +32,7 @@ function route(method, pattern, handler, { auth = true } = {}) {
 
 for (const register of [
   authRoutes, userRoutes, creatorRoutes, outreachRoutes, collaborationRoutes, taskRoutes,
-  contractRoutes, tagRoutes, dashboardRoutes, seedRoutes, expenseRoutes,
+  contractRoutes, tagRoutes, dashboardRoutes, seedRoutes, expenseRoutes, mediaRoutes,
 ]) {
   register(route);
 }
