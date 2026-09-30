@@ -14,6 +14,7 @@ const NAV = [
   { to: '/outreach', label: 'Outreach', icon: 'send' },
   { to: '/contracts', label: 'Verträge & Dokumente', icon: 'file' },
   { to: '/finance', label: 'Finanzen', icon: 'euro' },
+  { section: 'Media' },
   { to: '/media', label: 'Media Produktion', icon: 'camera' },
   { section: 'Produkt' },
   { to: '/app', label: 'App', icon: 'phoneApp' },
