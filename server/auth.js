@@ -52,13 +52,13 @@ async function getSecret() {
 
 const b64u = (buf) => Buffer.from(buf).toString('base64url');
 
-async function signToken(payload) {
+export async function signToken(payload) {
   const body = b64u(JSON.stringify(payload));
   const sig = crypto.createHmac('sha256', await getSecret()).update(body).digest('base64url');
   return `${body}.${sig}`;
 }
 
-async function verifyToken(token) {
+export async function verifyToken(token) {
   if (!token || typeof token !== 'string' || !token.includes('.')) return null;
   const [body, sig] = token.split('.');
   const expected = crypto.createHmac('sha256', await getSecret()).update(body).digest('base64url');
@@ -100,13 +100,13 @@ export function clearSessionCookie(req) {
   return parts.join('; ');
 }
 
-export const PUBLIC_USER_FIELDS = 'id, name, email, role, is_active, created_at, last_login_at';
+export const PUBLIC_USER_FIELDS = 'id, name, email, role, is_active, created_at, last_login_at, totp_enabled';
 
 /** Liefert den eingeloggten, aktiven Benutzer oder null. */
 export async function getSessionUser(req) {
   const token = parseCookies(req)[SESSION_COOKIE];
   const payload = await verifyToken(token);
-  if (!payload) return null;
+  if (!payload || payload.kind) return null; // Challenge-/Vertrauens-Token sind keine Sitzung
   const user = await one(`select ${PUBLIC_USER_FIELDS}, token_version from users where id = $1`, [payload.uid]);
   if (!user || !user.is_active || user.token_version !== payload.tv) return null;
   delete user.token_version;
@@ -142,4 +142,28 @@ export async function recordLoginAttempt(email, ip, success) {
   if (Math.random() < 0.05) {
     await q(`delete from login_attempts where created_at < now() - interval '30 days'`);
   }
+}
+
+// ---------- Zwei-Faktor: vertrauenswürdige Geräte ----------
+export const TRUST_COOKIE = 'crm_trust';
+const TRUST_DAYS = 30;
+
+export async function createTrustCookie(req, user) {
+  const exp = Math.floor(Date.now() / 1000) + TRUST_DAYS * 86400;
+  const token = await signToken({ kind: 'trust', uid: user.id, tv: user.token_version, exp });
+  const parts = [`${TRUST_COOKIE}=${token}`, 'Path=/api/auth', 'HttpOnly', 'SameSite=Strict', `Max-Age=${TRUST_DAYS * 86400}`];
+  if (isHttps(req)) parts.push('Secure');
+  return parts.join('; ');
+}
+
+export function clearTrustCookie(req) {
+  const parts = [`${TRUST_COOKIE}=`, 'Path=/api/auth', 'HttpOnly', 'SameSite=Strict', 'Max-Age=0'];
+  if (isHttps(req)) parts.push('Secure');
+  return parts.join('; ');
+}
+
+/** true, wenn dieses Gerät für den Benutzer als vertrauenswürdig markiert ist. */
+export async function isTrustedDevice(req, user) {
+  const payload = await verifyToken(parseCookies(req)[TRUST_COOKIE]);
+  return !!payload && payload.kind === 'trust' && payload.uid === user.id && payload.tv === user.token_version;
 }

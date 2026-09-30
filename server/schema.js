@@ -324,6 +324,15 @@ const MIGRATIONS = [
       updated_at timestamptz not null default now()
     )`,
   ],
+  // 5: Zwei-Faktor-Anmeldung
+  [
+    `alter table users add column if not exists totp_secret text`,
+    `alter table users add column if not exists totp_pending text`,
+    `alter table users add column if not exists totp_enabled boolean not null default false`,
+    `alter table users add column if not exists totp_last_step bigint`,
+    `alter table users add column if not exists totp_enabled_at timestamptz`,
+    `alter table users add column if not exists recovery_codes text[] not null default '{}'`,
+  ],
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;
