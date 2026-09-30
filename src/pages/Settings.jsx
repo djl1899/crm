@@ -18,7 +18,11 @@ export function SettingsPage() {
           <TwoFactorCard />
           {user.role === 'admin' && <DemoCard />}
         </div>
-        <TagsCard />
+        <div className="stack-lg">
+          <AgencyCard />
+          <DigestCard />
+          <TagsCard />
+        </div>
       </div>
     </div>
   );
@@ -338,6 +342,109 @@ function TwoFactorCard() {
           )}
         </div>
       )}
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Agentur & Provision (Admin)
+// ---------------------------------------------------------------------------
+function AgencyCard() {
+  const { user } = useAuth();
+  const { toast } = useUi();
+  const { data } = useApi('/settings');
+  const [v, setV] = useState(null);
+  const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+  const isAdmin = user.role === 'admin';
+  const vals = v || data?.settings;
+  if (!vals) return <Card title="Agentur & Provision"><Spinner /></Card>;
+  const set = (k) => (e) => setV({ ...vals, [k]: e.target.value });
+  const save = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.put('/settings', vals);
+      setErrors({});
+      setV(null);
+      invalidateAll();
+      toast('Einstellungen gespeichert.');
+    } catch (err) {
+      handleFormError(err, setErrors, toast);
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <Card title="Agentur & Provision" subtitle="Standard-Provision für Kooperationen und Angaben für das Mediakit.">
+      <form className="stack" onSubmit={save}>
+        <Field label="Standard-Agenturprovision (%)" error={errors.default_commission_rate} hint="Gilt für alle Creator ohne eigenen Satz. Pro Creator und pro Kooperation überschreibbar.">
+          <input className="input" type="number" min="0" max="100" step="0.5" value={vals.default_commission_rate} onChange={set('default_commission_rate')} disabled={!isAdmin} />
+        </Field>
+        <Field label="Agenturname" error={errors.agency_name}>
+          <input className="input" value={vals.agency_name || ''} onChange={set('agency_name')} disabled={!isAdmin} />
+        </Field>
+        <Field label="Kontakt-E-Mail (fürs Mediakit)" error={errors.agency_email}>
+          <input className="input" type="email" value={vals.agency_email || ''} onChange={set('agency_email')} disabled={!isAdmin} placeholder="z. B. booking@…" />
+        </Field>
+        <Field label="Website" error={errors.agency_website}>
+          <input className="input" value={vals.agency_website || ''} onChange={set('agency_website')} disabled={!isAdmin} placeholder="https://…" />
+        </Field>
+        {isAdmin ? <div className="form-actions"><Button variant="primary" type="submit" loading={saving}>Speichern</Button></div>
+          : <p className="muted small">Nur Administratoren können diese Werte ändern.</p>}
+      </form>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tägliche Zusammenfassung per Mail
+// ---------------------------------------------------------------------------
+function DigestCard() {
+  const { user, setUser } = useAuth();
+  const { toast } = useUi();
+  const status = useApi('/mail/status');
+  const [busy, setBusy] = useState(false);
+  const toggle = async (e) => {
+    const on = e.target.checked;
+    setUser({ ...user, digest_enabled: on }); // sofort anzeigen
+    try {
+      const r = await api.patch('/auth/me', { digest_enabled: on });
+      setUser({ ...user, ...r.user });
+      toast(on ? 'Tägliche Mail aktiviert.' : 'Tägliche Mail deaktiviert.');
+    } catch (err) {
+      setUser({ ...user, digest_enabled: !on });
+      toast(err.message, 'error');
+    }
+  };
+  const test = async () => {
+    setBusy(true);
+    try {
+      const r = await api.post('/mail/test-digest');
+      toast(`Test-Mail an ${r.to} gesendet.`);
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const configured = status.data?.configured;
+  return (
+    <Card title="Tägliche Zusammenfassung" subtitle="Jeden Morgen gegen 7 Uhr: fällige Follow-ups, deine Aufgaben, Drehs, Abgaben und Deadlines.">
+      <div className="stack">
+        {status.data && !configured && (
+          <div className="alert alert-warn"><Icon name="alert" size={16} /><span>Der Mailversand ist noch nicht eingerichtet. Ein Admin muss in Netlify die Umgebungsvariablen <code>SMTP_HOST</code>, <code>SMTP_USER</code> und <code>SMTP_PASS</code> setzen (siehe Anleitung).</span></div>
+        )}
+        <label className="checkbox">
+          <input type="checkbox" checked={!!user.digest_enabled} onChange={toggle} />
+          <span>Tägliche Mail an <strong>{user.email}</strong> senden</span>
+        </label>
+        <p className="muted small">An Tagen, an denen nichts fällig ist, kommt keine Mail.</p>
+        <div className="form-actions">
+          <Button icon="mail" onClick={test} loading={busy} disabled={!configured}>Test-Mail jetzt senden</Button>
+        </div>
+        {configured && <p className="muted small">Absender: {status.data.from}</p>}
+      </div>
     </Card>
   );
 }

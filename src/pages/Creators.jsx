@@ -5,6 +5,7 @@ import { useLookups } from '../lib/auth.jsx';
 import { qs } from '../lib/api.js';
 import { PageHeader, Button, Select, Avatar, StatusBadge, TagChip, Pagination, Spinner, ErrorBox, Empty, Badge } from '../components/ui.jsx';
 import { Icon } from '../components/Icon.jsx';
+import { ImportModal } from '../components/ImportModal.jsx';
 import { fmtCompact, fmtNumber, fmtRelative, fmtDateTime } from '../lib/format.js';
 import { CREATOR_STATUSES, OUTREACH_STATUSES, CONTRACT_STATUSES } from '../../shared/constants.js';
 
@@ -32,6 +33,7 @@ export function CreatorsPage() {
   const debounced = useDebounced(search, 300);
   const [showAdvanced, setShowAdvanced] = useState(() => ADVANCED.some((k) => params.get(k)));
   const options = useApi('/creators/filter-options');
+  const [importOpen, setImportOpen] = useState(false);
 
   useEffect(() => {
     if ((params.get('q') || '') !== debounced) setParams({ q: debounced, page: null });
@@ -71,7 +73,10 @@ export function CreatorsPage() {
       <PageHeader
         title="Creator"
         subtitle={data ? `${fmtNumber(data.total)} ${data.total === 1 ? 'Creator' : 'Creator'} gefunden` : ' '}
-        actions={<Button variant="primary" icon="plus" onClick={() => navigate('/creators/new')}>Creator hinzufügen</Button>}
+        actions={<>
+          <Button icon="upload" onClick={() => setImportOpen(true)}>Importieren</Button>
+          <Button variant="primary" icon="plus" onClick={() => navigate('/creators/new')}>Creator hinzufügen</Button>
+        </>}
       />
 
       <div className="filters card">
@@ -249,6 +254,7 @@ export function CreatorsPage() {
           <Pagination page={data.page} pages={data.pages} total={data.total} label="Creator" onPage={(p) => setParams({ page: p > 1 ? p : null })} />
         </div>
       ) : null}
+      <ImportModal open={importOpen} onClose={() => setImportOpen(false)} />
     </div>
   );
 }

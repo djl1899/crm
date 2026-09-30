@@ -10,7 +10,7 @@ import { CollaborationModal, UserSelect, CreatorPicker } from '../components/for
 import { useAuth } from '../lib/auth.jsx';
 import { useForm } from '../lib/useApi.js';
 import { fmtMoney, fmtDate, todayStr } from '../lib/format.js';
-import { INVOICE_STATUSES, EXPENSE_CATEGORIES } from '../../shared/constants.js';
+import { INVOICE_STATUSES, EXPENSE_CATEGORIES, PAYOUT_STATUSES } from '../../shared/constants.js';
 
 const MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
 
@@ -22,6 +22,7 @@ export function FinancePage() {
   const collabs = useApi('/collaborations' + qs({ invoice_status: invoice, page: params.get('page'), page_size: 25, sort: 'start' }));
   const { toast } = useUi();
   const exp = useApi('/finance/expenses-summary');
+  const settings = useApi('/settings');
   const et = exp.data?.totals || { total: 0, month: 0, year: 0 };
 
   if (loading && !data) return <Spinner />;
@@ -38,6 +39,15 @@ export function FinancePage() {
   }
   const max = Math.max(1, ...months.map((m) => m.value));
 
+  const setPayout = async (c, status) => {
+    try {
+      await api.patch(`/collaborations/${c.id}`, { payout_status: status });
+      invalidateAll();
+      toast('Auszahlungsstatus aktualisiert.');
+    } catch (e) {
+      toast(e.message, 'error');
+    }
+  };
   const setInvoice = async (c, status) => {
     try {
       await api.patch(`/collaborations/${c.id}`, { invoice_status: status });
@@ -50,22 +60,23 @@ export function FinancePage() {
 
   return (
     <div className="page">
-      <PageHeader title="Finanzen" subtitle="Umsatz aus bestätigten Kooperationen (Status Geplant bis Abgeschlossen)" />
+      <PageHeader title="Finanzen" subtitle={`Agenturumsatz = eure Provision aus Kooperationen (Standard ${settings.data?.settings.default_commission_rate ?? 20} %) + Media-Produktion. Kooperationen zählen ab Status „Geplant“.`} />
       <div className="stat-row">
-        <Stat icon="euro" label="Gesamtumsatz" value={fmtMoney(t.total)} />
-        <Stat icon="calendar" label="Aktueller Monat" value={fmtMoney(t.month)} />
-        <Stat icon="trending" label="Aktuelles Jahr" value={fmtMoney(t.year)} />
-        <Stat icon="check" label="Bezahlt" value={fmtMoney(t.paid)} tone="green" hint={`${fmtMoney(t.open)} offen · ${fmtMoney(t.overdue)} überfällig`} />
+        <Stat icon="euro" label="Agenturumsatz gesamt" value={fmtMoney(t.total)} hint={`${fmtMoney(t.agency_total)} Provision · ${fmtMoney(t.media_total)} Media`} />
+        <Stat icon="calendar" label="Agenturumsatz Monat" value={fmtMoney(t.month)} hint={`${fmtMoney(t.agency_month)} Provision · ${fmtMoney(t.media_month)} Media`} />
+        <Stat icon="trending" label="Agenturumsatz Jahr" value={fmtMoney(t.year)} hint={`Kooperationsvolumen ${fmtMoney(t.volume_year)}`} />
+        <Stat icon="users" label="Offene Creator-Auszahlungen" value={fmtMoney(t.payout_open)} tone={t.payout_due ? 'amber' : undefined}
+          hint={`${fmtMoney(t.payout_due)} fällig (Brand hat bezahlt) · ${fmtMoney(t.payout_done)} ausgezahlt`} />
       </div>
       <div className="stat-row">
         <Stat icon="inbox" label="Ausgaben aktueller Monat" value={fmtMoney(et.month)} tone={Number(et.month) ? 'red' : undefined} />
         <Stat icon="inbox" label="Ausgaben aktuelles Jahr" value={fmtMoney(et.year)} tone={Number(et.year) ? 'red' : undefined} hint={`${fmtMoney(et.total)} gesamt`} />
-        <Stat icon="trending" label="Ergebnis aktueller Monat" value={fmtMoney(t.month - et.month)} tone={t.month - et.month < 0 ? 'red' : 'green'} hint="Umsatz minus Ausgaben" />
-        <Stat icon="trending" label="Ergebnis aktuelles Jahr" value={fmtMoney(t.year - et.year)} tone={t.year - et.year < 0 ? 'red' : 'green'} hint="Umsatz minus Ausgaben" />
+        <Stat icon="trending" label="Ergebnis aktueller Monat" value={fmtMoney(t.month - et.month)} tone={t.month - et.month < 0 ? 'red' : 'green'} hint="Agenturumsatz minus Ausgaben" />
+        <Stat icon="trending" label="Ergebnis aktuelles Jahr" value={fmtMoney(t.year - et.year)} tone={t.year - et.year < 0 ? 'red' : 'green'} hint="Agenturumsatz minus Ausgaben" />
       </div>
 
       <div className="grid-2">
-        <Card title="Umsatz der letzten 12 Monate">
+        <Card title="Agenturumsatz der letzten 12 Monate" subtitle="Provision + Media-Produktion">
           <div className="bars" role="img" aria-label="Umsatz pro Monat">
             {months.map((m) => (
               <div key={m.key} className="bar-col" title={`${m.label}: ${fmtMoney(m.value)}`}>
@@ -76,18 +87,18 @@ export function FinancePage() {
             ))}
           </div>
         </Card>
-        <Card title="Umsatz pro Creator" padded={false}>
+        <Card title="Provision pro Creator" padded={false}>
           {!data.by_creator.length ? <Empty icon="euro" title="Noch kein Umsatz" /> : (
             <div className="table-wrap table-scroll">
               <table className="table">
-                <thead><tr><th>Creator</th><th className="num">Umsatz</th><th className="num">Bezahlt</th><th className="num">Offen</th></tr></thead>
+                <thead><tr><th>Creator</th><th className="num">Volumen</th><th className="num">Provision</th><th className="num">Auszahlung offen</th></tr></thead>
                 <tbody>
                   {data.by_creator.map((c) => (
                     <tr key={c.id}>
                       <td><Link to={`/creators/${c.id}?tab=finance`} className="strong">{c.display_name}</Link><div className="cell-sub muted">{c.collab_count} Kooperation(en)</div></td>
-                      <td className="num nowrap strong">{fmtMoney(c.revenue)}</td>
-                      <td className="num nowrap">{fmtMoney(c.paid)}</td>
-                      <td className="num nowrap">{fmtMoney(c.open)}</td>
+                      <td className="num nowrap">{fmtMoney(c.volume)}</td>
+                      <td className="num nowrap strong">{fmtMoney(c.agency)}</td>
+                      <td className="num nowrap">{fmtMoney(c.payout_open)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -97,14 +108,14 @@ export function FinancePage() {
         </Card>
       </div>
 
-      <Card title="Rechnungsstatus je Kooperation" actions={
+      <Card title="Rechnungen & Auszahlungen je Kooperation" actions={
         <Select value={invoice} onChange={(e) => setParams({ invoice_status: e.target.value, page: null })} placeholder="Alle Rechnungsstatus" options={INVOICE_STATUSES} />
       } padded={false}>
         {!collabs.data ? <Spinner /> : !collabs.data.items.length ? <Empty icon="euro" title="Keine Kooperationen" /> : (
           <>
             <div className="table-wrap">
               <table className="table">
-                <thead><tr><th>Kooperation</th><th>Creator</th><th>Start</th><th>Status</th><th className="num">Vergütung</th><th>Rechnungsstatus</th></tr></thead>
+                <thead><tr><th>Kooperation</th><th>Creator</th><th>Start</th><th>Status</th><th className="num">Vergütung</th><th className="num">Provision</th><th>Rechnung (Brand)</th><th>Auszahlung (Creator)</th></tr></thead>
                 <tbody>
                   {collabs.data.items.map((c) => (
                     <tr key={c.id} className={c.counts_as_revenue ? '' : 'row-muted'}>
@@ -113,9 +124,15 @@ export function FinancePage() {
                       <td className="nowrap">{fmtDate(c.start_date)}</td>
                       <td><StatusBadge value={c.status} /></td>
                       <td className="num nowrap">{fmtMoney(c.fee)}</td>
+                      <td className="num nowrap"><div className="strong">{fmtMoney(c.agency_fee)}</div><div className="cell-sub muted">{String(c.commission_effective).replace('.', ',')} %</div></td>
                       <td>
                         <select className="input input-sm" value={c.invoice_status} onChange={(e) => setInvoice(c, e.target.value)}>
                           {INVOICE_STATUSES.map((s) => <option key={s}>{s}</option>)}
+                        </select>
+                      </td>
+                      <td>
+                        <select className={`input input-sm ${c.payout_status === 'Offen' && c.invoice_status === 'Bezahlt' ? 'input-attention' : ''}`} value={c.payout_status} onChange={(e) => setPayout(c, e.target.value)} title={`${fmtMoney(c.payout)} an den Creator`}>
+                          {PAYOUT_STATUSES.map((s) => <option key={s} value={s}>{s} ({fmtMoney(c.payout)})</option>)}
                         </select>
                       </td>
                     </tr>

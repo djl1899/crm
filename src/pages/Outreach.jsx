@@ -1,13 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { api, qs } from '../lib/api.js';
 import { useApi, useDebounced, invalidateAll } from '../lib/useApi.js';
 import { useSearchParams, Link, useNavigate } from '../lib/router.jsx';
 import { useLookups } from '../lib/auth.jsx';
-import { PageHeader, Button, Select, Pagination, Spinner, ErrorBox, Empty, Segmented, Tabs, Card, Badge, IconButton, useUi } from '../components/ui.jsx';
+import { PageHeader, Button, Select, Pagination, Spinner, ErrorBox, Empty, Segmented, Tabs, Card, Badge, IconButton, Modal, Field, useUi, handleFormError } from '../components/ui.jsx';
+import { useAuth } from '../lib/auth.jsx';
+import { renderTemplate } from '../lib/templates.js';
 import { Icon } from '../components/Icon.jsx';
 import { OutreachModal } from '../components/forms.jsx';
 import { fmtDate, fmtDue, fmtDateTime } from '../lib/format.js';
-import { OUTREACH_CHANNELS } from '../../shared/constants.js';
+import { OUTREACH_CHANNELS, TEMPLATE_PLACEHOLDERS } from '../../shared/constants.js';
 
 export function OutreachPage() {
   const [params, setParams] = useSearchParams();
@@ -37,10 +40,13 @@ export function OutreachPage() {
         tabs={[
           { key: 'followups', label: 'Follow-ups', count: k ? k.followups_today + k.followups_overdue : undefined },
           { key: 'history', label: 'Kontaktverlauf' },
+          { key: 'templates', label: 'Vorlagen' },
         ]}
       />
       <div className="tab-panel">
-        {tab === 'followups' ? <FollowUps params={params} setParams={setParams} onEdit={(o) => setModal({ item: o })} /> : <History params={params} setParams={setParams} onEdit={(o) => setModal({ item: o })} />}
+        {tab === 'followups' && <FollowUps params={params} setParams={setParams} onEdit={(o) => setModal({ item: o })} />}
+        {tab === 'history' && <History params={params} setParams={setParams} onEdit={(o) => setModal({ item: o })} />}
+        {tab === 'templates' && <Templates />}
       </div>
       <OutreachModal open={!!modal} onClose={() => setModal(null)} activity={modal?.item} />
     </div>
@@ -161,5 +167,130 @@ function History({ params, setParams, onEdit }) {
         )}
       </Card>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Nachrichten-Vorlagen
+// ---------------------------------------------------------------------------
+const SAMPLE = {
+  creator: { display_name: 'Anna Müller', first_name: 'Anna', niche: 'Fashion', city: 'Berlin' },
+  socials: { instagram: { username: 'anna.style', followers: 48200 }, tiktok: { username: 'annamueller', followers: 12000 } },
+};
+
+function Templates() {
+  const { data, loading } = useApi('/templates');
+  const [modal, setModal] = useState(null);
+  return (
+    <div className="stack-lg">
+      <div className="toolbar">
+        <span className="muted">Vorlagen mit Platzhaltern wie {'{Vorname}'} – im Fenster „Kontakt erfassen“ auswählen, kopieren, senden.</span>
+        <Button variant="primary" icon="plus" onClick={() => setModal({ item: null })}>Neue Vorlage</Button>
+      </div>
+      <Card padded={false}>
+        {loading && !data ? <Spinner /> : !data?.items.length ? (
+          <Empty icon="note" title="Noch keine Vorlagen" text="Lege z. B. „Erstkontakt“, „Nachfassen“ und „Angebot“ an."
+            action={<Button variant="primary" icon="plus" onClick={() => setModal({ item: null })}>Neue Vorlage</Button>} />
+        ) : (
+          <ul className="tpl-list">
+            {data.items.map((t) => (
+              <li key={t.id} className="tpl-item" onClick={() => setModal({ item: t })}>
+                <div className="with-icon"><strong>{t.name}</strong>{t.channel && <Badge tone="gray">{t.channel}</Badge>}</div>
+                <div className="tpl-preview">{t.body}</div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+      <TemplateModal open={!!modal} item={modal?.item} onClose={() => setModal(null)} />
+    </div>
+  );
+}
+
+function TemplateModal({ open, item, onClose }) {
+  const { toast, confirm } = useUi();
+  const { user } = useAuth();
+  const [v, setV] = useState({});
+  const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [focus, setFocus] = useState('body');
+  const refs = { subject: useRef(null), body: useRef(null) };
+  useEffect(() => {
+    if (!open) return;
+    setErrors({});
+    setV({ name: item?.name || '', channel: item?.channel || '', subject: item?.subject || '', body: item?.body || '' });
+  }, [open]); // eslint-disable-line
+  const set = (k) => (e) => setV((x) => ({ ...x, [k]: e.target.value }));
+  // Platzhalter an der Cursor-Position einfügen
+  const insert = (ph) => {
+    const el = refs[focus].current;
+    const cur = v[focus] || '';
+    const start = el ? el.selectionStart ?? cur.length : cur.length;
+    const end = el ? el.selectionEnd ?? cur.length : cur.length;
+    const next = cur.slice(0, start) + ph + cur.slice(end);
+    flushSync(() => setV((x) => ({ ...x, [focus]: next })));
+    if (el) {
+      el.focus();
+      el.setSelectionRange(start + ph.length, start + ph.length);
+    }
+  };
+  const submit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      if (item) await api.patch(`/templates/${item.id}`, v);
+      else await api.post('/templates', v);
+      invalidateAll();
+      toast('Vorlage gespeichert.');
+      onClose();
+    } catch (err) {
+      handleFormError(err, setErrors, toast);
+    } finally {
+      setSaving(false);
+    }
+  };
+  const remove = async () => {
+    if (!(await confirm({ title: 'Vorlage löschen?', message: `„${item.name}“ wird gelöscht.`, confirmLabel: 'Löschen', danger: true }))) return;
+    await api.del(`/templates/${item.id}`).catch((err) => toast(err.message, 'error'));
+    invalidateAll();
+    onClose();
+  };
+  return (
+    <Modal open={open} onClose={onClose} size="lg" title={item ? 'Vorlage bearbeiten' : 'Neue Vorlage'}
+      footer={<>
+        {item && <Button variant="ghost-danger" icon="trash" onClick={remove} className="mr-auto">Löschen</Button>}
+        <Button onClick={onClose}>Abbrechen</Button>
+        <Button variant="primary" type="submit" form="tpl-form" loading={saving}>Speichern</Button>
+      </>}>
+      <form id="tpl-form" className="form-grid" onSubmit={submit}>
+        <Field label="Name der Vorlage" required error={errors.name}>
+          <input className="input" value={v.name || ''} onChange={set('name')} placeholder="z. B. Erstkontakt Instagram" required autoFocus />
+        </Field>
+        <Field label="Kanal" error={errors.channel}>
+          <Select value={v.channel} onChange={set('channel')} placeholder="– beliebig –" options={OUTREACH_CHANNELS} />
+        </Field>
+        <Field label="Betreff (für E-Mails)" error={errors.subject} className="span-2">
+          <input ref={refs.subject} className="input" value={v.subject || ''} onChange={set('subject')} onFocus={() => setFocus('subject')} />
+        </Field>
+        <Field label="Text" required error={errors.body} className="span-2">
+          <textarea ref={refs.body} className="input" rows={8} value={v.body || ''} onChange={set('body')} onFocus={() => setFocus('body')} required
+            placeholder={'Hey {Vorname}, wir sind LLK Management und lieben deinen {Nische}-Content …'} />
+        </Field>
+        <div className="span-2">
+          <div className="field-label" style={{ marginBottom: 6 }}>Platzhalter einfügen (Klick)</div>
+          <div className="placeholder-chips">
+            {TEMPLATE_PLACEHOLDERS.map(([ph, label]) => (
+              <button type="button" key={ph} className="placeholder-chip" title={label} onMouseDown={(e) => e.preventDefault()} onClick={() => insert(ph)}>{ph}</button>
+            ))}
+          </div>
+        </div>
+        {v.body && (
+          <div className="span-2">
+            <div className="field-label" style={{ marginBottom: 6 }}>Vorschau (Beispiel-Creator)</div>
+            <div className="suggest" style={{ whiteSpace: 'pre-wrap' }}>{renderTemplate(v.body, { ...SAMPLE, me: user })}</div>
+          </div>
+        )}
+      </form>
+    </Modal>
   );
 }

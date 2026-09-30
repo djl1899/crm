@@ -14,7 +14,7 @@ import {
   fmtNumber, fmtMoney, fmtDate, fmtDateTime, fmtRelative, fmtDue, fmtPercent, fmtBytes,
 } from '../lib/format.js';
 import {
-  CREATOR_STATUSES, OUTREACH_STATUSES, CONTRACT_STATUSES, PLATFORMS, INVOICE_STATUSES, TASK_STATUSES,
+  CREATOR_STATUSES, OUTREACH_STATUSES, CONTRACT_STATUSES, PLATFORMS, INVOICE_STATUSES, TASK_STATUSES, PAYOUT_STATUSES,
 } from '../../shared/constants.js';
 
 const TABS = [
@@ -43,7 +43,7 @@ export function CreatorProfilePage({ params }) {
       <div className="profile-kpis">
         <Kpi icon="instagram" label="Instagram Follower" value={fmtNumber(data.socials.instagram?.followers)} />
         <Kpi icon="tiktok" label="TikTok Follower" value={fmtNumber(data.socials.tiktok?.followers)} />
-        <Kpi icon="euro" label="Gesamtumsatz" value={fmtMoney(stats.total_revenue)} onClick={() => setSp({ tab: 'finance' })} />
+        <Kpi icon="euro" label="Gesamtumsatz" value={fmtMoney(stats.total_revenue)} sub={`davon Provision ${fmtMoney(stats.agency_revenue)}`} subTone="muted" onClick={() => setSp({ tab: 'finance' })} />
         <Kpi icon="briefcase" label="Aktive Kooperationen" value={stats.active_collabs} onClick={() => setSp({ tab: 'collaborations' })} />
         <Kpi icon="tasks" label="Offene Aufgaben" value={stats.open_tasks} tone={stats.overdue_tasks ? 'red' : null}
           sub={stats.overdue_tasks ? `${stats.overdue_tasks} überfällig` : null} onClick={() => setSp({ tab: 'tasks' })} />
@@ -80,13 +80,13 @@ export function CreatorProfilePage({ params }) {
   );
 }
 
-function Kpi({ icon, label, value, sub, tone, onClick }) {
+function Kpi({ icon, label, value, sub, subTone, tone, onClick }) {
   const Tag = onClick ? 'button' : 'div';
   return (
     <Tag className={`kpi ${onClick ? 'kpi-link' : ''}`} onClick={onClick} type={onClick ? 'button' : undefined}>
       <div className="kpi-label"><Icon name={icon} size={14} /> {label}</div>
       <div className={`kpi-value ${tone ? 'tone-' + tone : ''}`}>{value}</div>
-      {sub && <div className="kpi-sub">{sub}</div>}
+      {sub && <div className={`kpi-sub ${subTone === 'muted' ? 'muted' : ''}`}>{sub}</div>}
     </Tag>
   );
 }
@@ -189,6 +189,7 @@ function ProfileHeader({ data, onContact }) {
           <Menu
             trigger={<IconButton icon="more" label="Weitere Aktionen" className="icon-btn-bordered" />}
             items={[
+              { label: 'Mediakit öffnen (für Brands)', icon: 'sparkle', onClick: () => window.open(`/api/creators/${creator.id}/mediakit`, '_blank', 'noopener') },
               { label: 'Datenauskunft ansehen / drucken', icon: 'eye', onClick: () => window.open(`/api/creators/${creator.id}/export?format=html`, '_blank', 'noopener') },
               { label: 'Datenauskunft als JSON', icon: 'download', onClick: () => { window.location.href = `/api/creators/${creator.id}/export?format=json`; } },
               { label: archived ? 'Wiederherstellen' : 'Archivieren', icon: archived ? 'restore' : 'archive', onClick: archive },
@@ -269,7 +270,8 @@ function OverviewTab({ data, open, setTab }) {
           <Fact label="Nachfassen am" value={data.next_follow_up ? fmtDate(data.next_follow_up.follow_up_date) : '–'} />
           <Fact label="Kooperationen" value={`${stats.collab_count} gesamt · ${stats.active_collabs} aktiv`} />
           <Fact label="Vertrag" value={contract.status + (contract.end_date ? ` (bis ${fmtDate(contract.end_date)})` : '')} />
-          <Fact label="Gesamtumsatz" value={fmtMoney(stats.total_revenue)} />
+          <Fact label="Gesamtumsatz" value={`${fmtMoney(stats.total_revenue)} (Provision ${fmtMoney(stats.agency_revenue)})`} />
+          <Fact label="Provision" value={creator.commission_rate !== null && creator.commission_rate !== undefined ? `${String(creator.commission_rate).replace('.', ',')} % (individuell)` : 'Standard'} />
           <Fact label="Angelegt" value={`${fmtDate(creator.created_at)}${creator.created_by_name ? ' von ' + creator.created_by_name : ''}`} />
         </dl>
       </Card>
@@ -685,6 +687,15 @@ function FinanceTab({ creator, stats, open }) {
   const { data } = useApi(`/collaborations${qs({ creator_id: creator.id, page_size: 200 })}`);
   const { toast } = useUi();
   const items = data?.items || [];
+  const setField = async (c, patch) => {
+    try {
+      await api.patch(`/collaborations/${c.id}`, patch);
+      invalidateAll();
+      toast('Gespeichert.');
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  };
   const setInvoice = async (c, invoice_status) => {
     try {
       await api.patch(`/collaborations/${c.id}`, { invoice_status });
@@ -698,14 +709,14 @@ function FinanceTab({ creator, stats, open }) {
     <div className="stack-lg">
       <div className="stat-row stat-row-3">
         <div className="stat"><div className="stat-label">Gesamtumsatz</div><div className="stat-value">{fmtMoney(stats.total_revenue)}</div><div className="stat-hint">Summe bestätigter Kooperationen</div></div>
-        <div className="stat"><div className="stat-label">Bezahlt</div><div className="stat-value tone-green">{fmtMoney(stats.paid_revenue)}</div></div>
-        <div className="stat"><div className="stat-label">Offene Rechnungen</div><div className="stat-value">{fmtMoney(stats.open_invoices)}</div></div>
+        <div className="stat"><div className="stat-label">Agenturprovision</div><div className="stat-value tone-green">{fmtMoney(stats.agency_revenue)}</div><div className="stat-hint">{creator.commission_rate !== null && creator.commission_rate !== undefined ? `${String(creator.commission_rate).replace('.', ',')} % individuell` : 'Standard-Provision'}</div></div>
+        <div className="stat"><div className="stat-label">Offene Auszahlung an Creator</div><div className="stat-value">{fmtMoney(stats.payout_open)}</div><div className="stat-hint">{fmtMoney(stats.open_invoices)} Rechnungen an Brands offen</div></div>
       </div>
       <Card title="Kooperationen & Rechnungsstatus" padded={false}>
         {!items.length ? <Empty icon="euro" title="Noch keine Kooperationen" /> : (
           <div className="table-wrap">
             <table className="table">
-              <thead><tr><th>Kooperation</th><th>Status</th><th>Zeitraum</th><th className="num">Vergütung</th><th>Rechnungsstatus</th></tr></thead>
+              <thead><tr><th>Kooperation</th><th>Status</th><th>Zeitraum</th><th className="num">Vergütung</th><th className="num">Provision</th><th>Rechnung (Brand)</th><th>Auszahlung (Creator)</th></tr></thead>
               <tbody>
                 {items.map((c) => (
                   <tr key={c.id} className={c.counts_as_revenue ? '' : 'row-muted'}>
@@ -713,15 +724,21 @@ function FinanceTab({ creator, stats, open }) {
                     <td><StatusBadge value={c.status} /></td>
                     <td className="nowrap">{fmtDate(c.start_date)} – {fmtDate(c.end_date)}</td>
                     <td className="num nowrap">{fmtMoney(c.fee)}{!c.counts_as_revenue && <div className="cell-sub muted">nicht im Umsatz</div>}</td>
+                    <td className="num nowrap"><div className="strong">{fmtMoney(c.agency_fee)}</div><div className="cell-sub muted">{String(c.commission_effective).replace('.', ',')} %</div></td>
                     <td>
                       <select className="input input-sm" value={c.invoice_status} onChange={(e) => setInvoice(c, e.target.value)}>
                         {INVOICE_STATUSES.map((s) => <option key={s}>{s}</option>)}
                       </select>
                     </td>
+                    <td>
+                      <select className="input input-sm" value={c.payout_status} onChange={(e) => setField(c, { payout_status: e.target.value })}>
+                        {PAYOUT_STATUSES.map((s) => <option key={s} value={s}>{s} ({fmtMoney(c.payout)})</option>)}
+                      </select>
+                    </td>
                   </tr>
                 ))}
               </tbody>
-              <tfoot><tr><td colSpan={3}><strong>Gesamtumsatz</strong></td><td className="num"><strong>{fmtMoney(stats.total_revenue)}</strong></td><td /></tr></tfoot>
+              <tfoot><tr><td colSpan={3}><strong>Summe (bestätigte Kooperationen)</strong></td><td className="num"><strong>{fmtMoney(stats.total_revenue)}</strong></td><td className="num"><strong>{fmtMoney(stats.agency_revenue)}</strong></td><td /><td /></tr></tfoot>
             </table>
           </div>
         )}

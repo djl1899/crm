@@ -37,6 +37,7 @@ function CreatorForm({ editId, profile }) {
     language: c.language || '', niche: c.niche || '', interests: c.interests || '', notes: c.notes || '',
     manager_id: editId ? (c.manager_id ? String(c.manager_id) : '') : String(user.id),
     status: c.status || 'Lead', outreach_status: c.outreach_status || 'Noch nicht kontaktiert', contacted: !!c.contacted,
+    commission_rate: c.commission_rate ?? '', bio: c.bio || '',
     tag_ids: (profile?.tags || []).map((t) => t.id),
     instagram: social('instagram'), tiktok: social('tiktok'),
   });
@@ -132,6 +133,9 @@ function CreatorForm({ editId, profile }) {
               <Field label="Sprache" error={f.errors.language}>
                 <input className="input" value={v.language} onChange={f.set('language')} placeholder="z. B. Deutsch, Englisch" />
               </Field>
+              <Field label="Kurzvorstellung (öffentlich, erscheint im Mediakit)" error={f.errors.bio} className="span-2">
+                <textarea className="input" rows={3} value={v.bio} onChange={f.set('bio')} placeholder="z. B. Anna teilt mit ihrer Community in Berlin nachhaltige Mode, ehrliche Reviews und Alltags-Looks." />
+              </Field>
               <Field label="Interessen" error={f.errors.interests} className="span-2">
                 <input className="input" value={v.interests} onChange={f.set('interests')} placeholder="z. B. Reisen, Mode, Kaffee" />
               </Field>
@@ -206,6 +210,9 @@ function CreatorForm({ editId, profile }) {
               </Field>
               <Field label="Verantwortlicher Manager" error={f.errors.manager_id}>
                 <UserSelect value={v.manager_id} onChange={f.set('manager_id')} />
+              </Field>
+              <Field label="Agenturprovision (%)" error={f.errors.commission_rate} hint="Leer = Standard aus den Einstellungen. Einzelne Kooperationen können abweichen.">
+                <input className="input" type="number" min="0" max="100" step="0.5" value={v.commission_rate} onChange={f.set('commission_rate')} placeholder="Standard" />
               </Field>
               <Field label="Tags">
                 <TagPicker value={v.tag_ids} onChange={(ids) => f.setValues((x) => ({ ...x, tag_ids: ids }))} />
