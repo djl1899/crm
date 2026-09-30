@@ -73,7 +73,9 @@ http.createServer(async (req, res) => {
     const request = new Request(url, { method: req.method, headers: req.headers, body: ['GET', 'HEAD'].includes(req.method) ? undefined : body });
     const response = await handle(request);
     const headers = {};
-    response.headers.forEach((v, k) => (headers[k] = v));
+    response.headers.forEach((v, k) => { if (k !== 'set-cookie') headers[k] = v; });
+    const cookies = response.headers.getSetCookie ? response.headers.getSetCookie() : [];
+    if (cookies.length) headers['set-cookie'] = cookies;
     res.writeHead(response.status, headers);
     res.end(Buffer.from(await response.arrayBuffer()));
     return;
