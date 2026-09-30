@@ -131,7 +131,7 @@ ok(r.data.stats.active_collabs === 1, 'Aktive Kooperationen gezählt');
 r = await call('PATCH', `/collaborations/${collabId}`, { invoice_status: 'Bezahlt' });
 ok(r.status === 200, 'Rechnungsstatus geändert');
 r = await call('GET', '/finance/summary');
-ok(r.data.totals.total === 7000 && r.data.totals.month === 7000 && r.data.totals.paid === 3500, 'Finanzübersicht Monat/Gesamt/Bezahlt');
+ok(r.data.totals.volume === 7000 && r.data.totals.agency_total === 1400 && r.data.totals.total === 1400 && r.data.totals.month === 1400 && r.data.totals.paid === 3500, 'Finanzübersicht: Volumen 7.000 €, Provision 20 % = 1.400 €, bezahlt 3.500 €');
 r = await call('GET', `/collaborations?creator_id=${anna}&timeframe=past`);
 ok(r.data.items.length === 2, 'Vergangene Kooperationen (abgeschlossen/abgebrochen)');
 
