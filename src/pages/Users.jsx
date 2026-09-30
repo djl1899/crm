@@ -24,7 +24,7 @@ export function UsersPage() {
       <Card padded={false}>
         <div className="table-wrap">
           <table className="table">
-            <thead><tr><th>Name</th><th>E-Mail</th><th>Rolle</th><th>Status</th><th className="num">Creator</th><th>Letzter Login</th><th>Erstellt</th>{isAdmin && <th />}</tr></thead>
+            <thead><tr><th>Name</th><th>E-Mail</th><th>Rolle</th><th>Status</th><th>2FA</th><th className="num">Creator</th><th>Letzter Login</th><th>Erstellt</th>{isAdmin && <th />}</tr></thead>
             <tbody>
               {data.users.map((u) => (
                 <tr key={u.id} className={u.is_active ? '' : 'row-muted'}>
@@ -32,6 +32,7 @@ export function UsersPage() {
                   <td>{u.email}</td>
                   <td>{u.role === 'admin' ? <Badge tone="violet">Administrator</Badge> : <Badge tone="gray">Manager</Badge>}</td>
                   <td>{u.is_active ? <Badge tone="green" dot>Aktiv</Badge> : <Badge tone="muted" dot>Inaktiv</Badge>}</td>
+                  <td>{u.totp_enabled ? <Badge tone="green">An</Badge> : <span className="muted">aus</span>}</td>
                   <td className="num">{u.creator_count}</td>
                   <td className="nowrap muted">{u.last_login_at ? fmtRelative(u.last_login_at) : 'noch nie'}</td>
                   <td className="nowrap muted">{fmtDate(u.created_at)}</td>
@@ -78,9 +79,22 @@ function UserModal({ open, item, onClose }) {
     }
   };
   const self = item?.id === user.id;
+  const { confirm } = useUi();
+  const reset2fa = async () => {
+    const ok = await confirm({ title: 'Zwei-Faktor zurücksetzen?', message: `${item.name} kann sich danach wieder nur mit Passwort anmelden und sollte die Zwei-Faktor-Anmeldung neu einrichten. Nutze das z. B., wenn das Handy verloren wurde.`, confirmLabel: 'Zurücksetzen', danger: true });
+    if (!ok) return;
+    try {
+      await api.patch(`/users/${item.id}`, { reset_2fa: true });
+      invalidateAll();
+      toast('Zwei-Faktor-Anmeldung zurückgesetzt.');
+      onClose();
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  };
   return (
     <Modal open={open} onClose={onClose} title={item ? 'Benutzer bearbeiten' : 'Benutzer hinzufügen'}
-      footer={<><Button onClick={onClose}>Abbrechen</Button><Button variant="primary" type="submit" form="user-form" loading={saving}>Speichern</Button></>}>
+      footer={<>{item?.totp_enabled && !self && <Button variant="ghost-danger" icon="shield" onClick={reset2fa} className="mr-auto">2FA zurücksetzen</Button>}<Button onClick={onClose}>Abbrechen</Button><Button variant="primary" type="submit" form="user-form" loading={saving}>Speichern</Button></>}>
       <form id="user-form" className="form-grid" onSubmit={submit}>
         <Field label="Name" required error={f.errors.name}><input className="input" value={v.name || ''} onChange={f.set('name')} required autoFocus /></Field>
         <Field label="E-Mail" required error={f.errors.email}><input className="input" type="email" value={v.email || ''} onChange={f.set('email')} required /></Field>

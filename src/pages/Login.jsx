@@ -8,6 +8,9 @@ export function LoginPage() {
   const [values, setValues] = useState({ name: '', email: '', password: '', password2: '', demo: true });
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [twofa, setTwofa] = useState(null); // { challenge }
+  const [code, setCode] = useState('');
+  const [remember, setRemember] = useState(true);
   const set = (k) => (e) => setValues((v) => ({ ...v, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
   const setup = auth.needsSetup;
 
@@ -18,13 +21,74 @@ export function LoginPage() {
     setBusy(true);
     try {
       if (setup) await auth.setup({ name: values.name, email: values.email, password: values.password, demo: values.demo });
-      else await auth.login(values.email, values.password);
+      else {
+        const res = await auth.login(values.email, values.password);
+        if (res.twofa_required) setTwofa({ challenge: res.challenge });
+      }
     } catch (err) {
       setError(err.message);
     } finally {
       setBusy(false);
     }
   };
+
+  const submitCode = async (e) => {
+    e.preventDefault();
+    setError(null);
+    setBusy(true);
+    try {
+      await auth.loginTwoFactor(twofa.challenge, code, remember);
+    } catch (err) {
+      setError(err.message);
+      if (err.status === 401 && /Anmeldung ist abgelaufen/.test(err.message)) setTwofa(null);
+      setCode('');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (twofa) {
+    return (
+      <div className="auth-page">
+        <div className="auth-card">
+          <div className="auth-brand">
+            <span className="brand-mark">C</span>
+            <span className="brand-name">Creator CRM</span>
+          </div>
+          <h1>Bestätigungscode</h1>
+          <p className="muted">Öffne deine Authenticator-App und gib den 6-stelligen Code für „Creator CRM“ ein.</p>
+          <form onSubmit={submitCode} className="stack">
+            <Field label="Code">
+              <input
+                className="input code-input"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="123456"
+                maxLength={14}
+                autoFocus
+                required
+              />
+            </Field>
+            <label className="checkbox">
+              <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+              <span>Diesem Gerät 30 Tage vertrauen</span>
+            </label>
+            {error && (
+              <div className="alert alert-error">
+                <Icon name="alert" size={16} />
+                <span>{error}</span>
+              </div>
+            )}
+            <Button variant="primary" type="submit" loading={busy} className="btn-block">Bestätigen</Button>
+            <p className="muted small">Handy nicht zur Hand? Gib stattdessen einen deiner Wiederherstellungscodes ein (Format XXXXX-XXXXX).</p>
+            <button type="button" className="link small" onClick={() => { setTwofa(null); setError(null); setCode(''); }}>← Zurück zur Anmeldung</button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="auth-page">

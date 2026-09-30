@@ -189,6 +189,8 @@ function ProfileHeader({ data, onContact }) {
           <Menu
             trigger={<IconButton icon="more" label="Weitere Aktionen" className="icon-btn-bordered" />}
             items={[
+              { label: 'Datenauskunft ansehen / drucken', icon: 'eye', onClick: () => window.open(`/api/creators/${creator.id}/export?format=html`, '_blank', 'noopener') },
+              { label: 'Datenauskunft als JSON', icon: 'download', onClick: () => { window.location.href = `/api/creators/${creator.id}/export?format=json`; } },
               { label: archived ? 'Wiederherstellen' : 'Archivieren', icon: archived ? 'restore' : 'archive', onClick: archive },
               user.role === 'admin' && { label: 'Endgültig löschen', icon: 'trash', danger: true, onClick: remove },
             ]}

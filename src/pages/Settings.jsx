@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { api } from '../lib/api.js';
 import { useApi, invalidateAll } from '../lib/useApi.js';
 import { useAuth } from '../lib/auth.jsx';
-import { PageHeader, Card, Button, Field, TagChip, IconButton, Spinner, useUi, handleFormError } from '../components/ui.jsx';
+import { PageHeader, Card, Button, Field, TagChip, IconButton, Spinner, Badge, useUi, handleFormError } from '../components/ui.jsx';
+import { Icon } from '../components/Icon.jsx';
 import { TAG_COLORS } from '../../shared/constants.js';
 
 export function SettingsPage() {
@@ -14,6 +15,7 @@ export function SettingsPage() {
         <div className="stack-lg">
           <ProfileCard />
           <PasswordCard />
+          <TwoFactorCard />
           {user.role === 'admin' && <DemoCard />}
         </div>
         <TagsCard />
@@ -190,6 +192,152 @@ function DemoCard() {
   return (
     <Card title="Demo-Daten" subtitle="Nur für leere Datenbanken – zum Ausprobieren.">
       <Button onClick={load} loading={busy} icon="sparkle">Demo-Daten laden</Button>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Zwei-Faktor-Anmeldung
+// ---------------------------------------------------------------------------
+function TwoFactorCard() {
+  const { toast } = useUi();
+  const { user, setUser } = useAuth();
+  const status = useApi('/auth/2fa/status');
+  const [step, setStep] = useState('idle'); // idle | setup | codes | disable | regen
+  const [setupData, setSetupData] = useState(null);
+  const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
+  const [codes, setCodes] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const enabled = status.data?.totp_enabled;
+
+  const reset = () => { setStep('idle'); setCode(''); setPassword(''); setErr(null); setSetupData(null); };
+  const run = async (fn) => {
+    setBusy(true);
+    setErr(null);
+    try { await fn(); } catch (e) { setErr(e.message); } finally { setBusy(false); }
+  };
+
+  const start = () => run(async () => {
+    setSetupData(await api.post('/auth/2fa/setup'));
+    setStep('setup');
+  });
+  const enable = (e) => {
+    e.preventDefault();
+    run(async () => {
+      const r = await api.post('/auth/2fa/enable', { code });
+      setCodes(r.recovery_codes);
+      setStep('codes');
+      setCode('');
+      setUser({ ...user, totp_enabled: true });
+      invalidateAll();
+      toast('Zwei-Faktor-Anmeldung aktiviert.');
+    });
+  };
+  const disable = (e) => {
+    e.preventDefault();
+    run(async () => {
+      await api.post('/auth/2fa/disable', { password });
+      setUser({ ...user, totp_enabled: false });
+      invalidateAll();
+      reset();
+      toast('Zwei-Faktor-Anmeldung deaktiviert.');
+    });
+  };
+  const regen = (e) => {
+    e.preventDefault();
+    run(async () => {
+      const r = await api.post('/auth/2fa/recovery-codes', { password });
+      setCodes(r.recovery_codes);
+      setPassword('');
+      setStep('codes');
+      invalidateAll();
+    });
+  };
+  const downloadCodes = () => {
+    const text = `Creator CRM – Wiederherstellungscodes für ${user.email}\nJeder Code funktioniert genau einmal.\n\n${codes.join('\n')}\n`;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+    a.download = 'creator-crm-wiederherstellungscodes.txt';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  return (
+    <Card
+      title="Zwei-Faktor-Anmeldung"
+      subtitle="Zusätzlich zum Passwort ein Code aus einer App auf deinem Handy."
+      actions={status.data && (enabled ? <Badge tone="green" dot>Aktiv</Badge> : <Badge tone="gray" dot>Aus</Badge>)}
+    >
+      {!status.data ? <Spinner /> : (
+        <div className="stack">
+          {step === 'idle' && !enabled && (
+            <>
+              <p className="muted">Schützt dein Konto, selbst wenn jemand dein Passwort kennt. Du brauchst eine Authenticator-App, z. B. Google Authenticator, Microsoft Authenticator oder die Passwörter-App auf dem iPhone.</p>
+              <div className="form-actions"><Button variant="primary" icon="shield" onClick={start} loading={busy}>Einrichten</Button></div>
+            </>
+          )}
+
+          {step === 'setup' && setupData && (
+            <form className="stack" onSubmit={enable}>
+              <ol className="twofa-steps">
+                <li>Authenticator-App öffnen und <strong>„Konto hinzufügen“ / „QR-Code scannen“</strong> wählen.</li>
+                <li>Diesen QR-Code scannen:</li>
+              </ol>
+              <div className="qr-box" dangerouslySetInnerHTML={{ __html: setupData.qr_svg }} />
+              <details className="small">
+                <summary className="link">QR-Code lässt sich nicht scannen? Schlüssel manuell eingeben</summary>
+                <div className="secret-box">{setupData.secret.match(/.{1,4}/g).join(' ')}</div>
+                <p className="muted">Kontoname: {user.email} · Typ: zeitbasiert</p>
+              </details>
+              <ol className="twofa-steps" start={3}><li>Den 6-stelligen Code aus der App eingeben:</li></ol>
+              <input className="input code-input" value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" autoComplete="one-time-code" placeholder="123456" maxLength={7} autoFocus required />
+              {err && <div className="alert alert-error"><Icon name="alert" size={16} /><span>{err}</span></div>}
+              <div className="form-actions">
+                <Button onClick={reset}>Abbrechen</Button>
+                <Button variant="primary" type="submit" loading={busy}>Aktivieren</Button>
+              </div>
+            </form>
+          )}
+
+          {step === 'codes' && (
+            <>
+              <div className="alert alert-warn"><Icon name="alert" size={16} /><span><strong>Jetzt sichern!</strong> Diese Codes werden nur einmal angezeigt. Damit kommst du rein, falls dein Handy weg ist. Jeder Code funktioniert einmal.</span></div>
+              <div className="recovery-grid">{codes.map((c) => <code key={c}>{c}</code>)}</div>
+              <div className="form-actions">
+                <Button icon="download" onClick={downloadCodes}>Als Datei speichern</Button>
+                <Button onClick={() => { navigator.clipboard?.writeText(codes.join('\n')); toast('Kopiert.'); }}>Kopieren</Button>
+                <Button variant="primary" onClick={() => { setCodes([]); reset(); }}>Gespeichert, fertig</Button>
+              </div>
+            </>
+          )}
+
+          {step === 'idle' && enabled && (
+            <>
+              <p className="muted">
+                Aktiv seit {new Date(status.data.totp_enabled_at).toLocaleDateString('de-DE')}. Noch <strong>{status.data.recovery_left}</strong> unbenutzte Wiederherstellungscodes.
+              </p>
+              <div className="form-actions">
+                <Button onClick={() => setStep('regen')}>Neue Wiederherstellungscodes</Button>
+                <Button variant="ghost-danger" onClick={() => setStep('disable')}>Deaktivieren</Button>
+              </div>
+            </>
+          )}
+
+          {(step === 'disable' || step === 'regen') && (
+            <form className="stack" onSubmit={step === 'disable' ? disable : regen}>
+              <p className="muted">{step === 'disable' ? 'Zum Deaktivieren bitte dein Passwort eingeben.' : 'Zum Erzeugen neuer Codes bitte dein Passwort eingeben. Die alten Codes werden ungültig.'}</p>
+              <input className="input" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Passwort" autoFocus required />
+              {err && <div className="alert alert-error"><Icon name="alert" size={16} /><span>{err}</span></div>}
+              <div className="form-actions">
+                <Button onClick={reset}>Abbrechen</Button>
+                <Button variant={step === 'disable' ? 'danger' : 'primary'} type="submit" loading={busy}>{step === 'disable' ? 'Deaktivieren' : 'Neue Codes erzeugen'}</Button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
     </Card>
   );
 }
