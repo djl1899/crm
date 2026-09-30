@@ -333,6 +333,35 @@ const MIGRATIONS = [
     `alter table users add column if not exists totp_enabled_at timestamptz`,
     `alter table users add column if not exists recovery_codes text[] not null default '{}'`,
   ],
+  // 6: Provision, Nachrichten-Vorlagen, tägliche Mail
+  [
+    `alter table creators add column if not exists commission_rate numeric(5,2)`,
+    `alter table collaborations add column if not exists commission_rate numeric(5,2)`,
+    `alter table collaborations add column if not exists payout_status text not null default 'Offen'`,
+    `alter table users add column if not exists digest_enabled boolean not null default false`,
+    `alter table creators add column if not exists bio text`,
+    `insert into app_meta (key, value) values ('default_commission_rate', '20') on conflict (key) do nothing`,
+    `create or replace view collab_finance as
+      select co.id, co.creator_id, co.status, co.invoice_status, co.payout_status, co.fee,
+        coalesce(co.start_date, co.deadline, co.end_date, co.created_at::date) as rev_date,
+        coalesce(co.commission_rate, c.commission_rate,
+          (select value::numeric from app_meta where key = 'default_commission_rate'), 20) as rate,
+        round(co.fee * coalesce(co.commission_rate, c.commission_rate,
+          (select value::numeric from app_meta where key = 'default_commission_rate'), 20) / 100, 2) as agency_fee,
+        co.fee - round(co.fee * coalesce(co.commission_rate, c.commission_rate,
+          (select value::numeric from app_meta where key = 'default_commission_rate'), 20) / 100, 2) as payout
+      from collaborations co join creators c on c.id = co.creator_id`,
+    `create table if not exists message_templates (
+      id serial primary key,
+      name text not null,
+      channel text,
+      subject text,
+      body text not null,
+      created_by integer references users(id) on delete set null,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )`,
+  ],
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

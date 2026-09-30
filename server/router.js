@@ -16,6 +16,8 @@ import expenseRoutes from './routes/expenses.js';
 import mediaRoutes from './routes/media.js';
 import appRoutes from './routes/app.js';
 import exportRoutes from './routes/export.js';
+import settingsRoutes from './routes/settings.js';
+import mediakitRoutes from './routes/mediakit.js';
 
 const routes = [];
 
@@ -34,7 +36,7 @@ function route(method, pattern, handler, { auth = true } = {}) {
 
 for (const register of [
   authRoutes, userRoutes, creatorRoutes, outreachRoutes, collaborationRoutes, taskRoutes,
-  contractRoutes, tagRoutes, dashboardRoutes, seedRoutes, expenseRoutes, mediaRoutes, appRoutes, exportRoutes,
+  contractRoutes, tagRoutes, dashboardRoutes, seedRoutes, expenseRoutes, mediaRoutes, appRoutes, exportRoutes, settingsRoutes, mediakitRoutes,
 ]) {
   register(route);
 }
