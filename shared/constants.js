@@ -73,6 +73,16 @@ export const APP_ROADMAP_AREAS = ['Influencer-App', 'Firmen-Portal', 'KI-Matchin
 export const APP_UPDATE_TYPES = ['Meilenstein', 'Release', 'Feature', 'Bugfix', 'Notiz'];
 export const APP_PLATFORMS = ['Instagram', 'TikTok', 'YouTube', 'Sonstiges'];
 
+export const PAYOUT_STATUSES = ['Offen', 'Ausgezahlt'];
+// Media-Projekte, die als Umsatz zählen (gebucht bis abgeschlossen)
+export const MEDIA_REVENUE_EXCLUDED = ['Anfrage', 'Angebot gesendet', 'Abgebrochen'];
+
+// Platzhalter für Nachrichten-Vorlagen
+export const TEMPLATE_PLACEHOLDERS = [
+  ['{Vorname}', 'Vorname (sonst Name)'], ['{Name}', 'Creator-Name'], ['{Nische}', 'Nische'], ['{Ort}', 'Ort'],
+  ['{Instagram}', '@Instagram'], ['{TikTok}', '@TikTok'], ['{Follower}', 'Follower (höchster Wert)'], ['{MeinName}', 'Dein Name'],
+];
+
 export const INVOICE_STATUSES = ['Nicht erstellt', 'Offen', 'Eingereicht', 'Bezahlt', 'Überfällig'];
 
 export const TASK_STATUSES = ['Offen', 'In Bearbeitung', 'Wartet auf Creator', 'Erledigt', 'Abgebrochen'];
