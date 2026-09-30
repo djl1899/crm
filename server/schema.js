@@ -240,6 +240,90 @@ const MIGRATIONS = [
     `create index if not exists media_shoot_idx on media_projects (shoot_at)`,
     `create index if not exists media_delivery_idx on media_projects (delivery_date)`,
   ],
+  // 4: Bereich "App" (Marktplatz-App) – komplett getrennt vom CRM
+  [
+    `create table if not exists app_influencers (
+      id serial primary key,
+      name text not null,
+      handle text,
+      platform text,
+      followers integer,
+      niche text,
+      city text,
+      email text,
+      status text not null default 'Interessent',
+      source text,
+      joined_at date,
+      notes text,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )`,
+    `create index if not exists app_influencers_status_idx on app_influencers (status)`,
+    `create table if not exists app_companies (
+      id serial primary key,
+      name text not null,
+      industry text,
+      website text,
+      contact_name text,
+      contact_email text,
+      status text not null default 'Lead',
+      monthly_budget numeric(12,2),
+      notes text,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )`,
+    `create index if not exists app_companies_status_idx on app_companies (status)`,
+    `create table if not exists app_campaigns (
+      id serial primary key,
+      company_id integer references app_companies(id) on delete set null,
+      name text not null,
+      status text not null default 'Entwurf',
+      budget numeric(12,2) not null default 0,
+      target_influencers integer,
+      target_niche text,
+      target_platform text,
+      max_followers integer,
+      start_date date,
+      end_date date,
+      goal text,
+      notes text,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )`,
+    `create table if not exists app_campaign_influencers (
+      id serial primary key,
+      campaign_id integer not null references app_campaigns(id) on delete cascade,
+      influencer_id integer not null references app_influencers(id) on delete cascade,
+      fee numeric(12,2) not null default 0,
+      status text not null default 'Angefragt',
+      created_at timestamptz not null default now(),
+      unique (campaign_id, influencer_id)
+    )`,
+    `create table if not exists app_roadmap (
+      id serial primary key,
+      title text not null,
+      description text,
+      area text,
+      status text not null default 'Idee',
+      priority text not null default 'Normal',
+      target_date date,
+      assignee_id integer references users(id) on delete set null,
+      done_at timestamptz,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )`,
+    `create table if not exists app_updates (
+      id serial primary key,
+      published_at date not null default current_date,
+      version text,
+      type text not null default 'Notiz',
+      title text not null,
+      body text,
+      author_id integer references users(id) on delete set null,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )`,
+  ],
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;
