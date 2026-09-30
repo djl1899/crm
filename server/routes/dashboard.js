@@ -35,11 +35,16 @@ export default function register(route) {
         (select count(*)::int from creators c left join contracts ct on ct.creator_id = c.id
            where c.status <> 'Archiviert' and coalesce(ct.status, 'Kein Vertrag') = 'Kein Vertrag') as creators_without_contract,
 
-        (select coalesce(sum(fee), 0) from collaborations co where status in (${REVENUE_COLLAB_SQL})) as revenue_total,
-        (select coalesce(sum(fee), 0) from collaborations co where status in (${REVENUE_COLLAB_SQL})
-           and date_trunc('month', ${REVENUE_DATE_SQL}) = date_trunc('month', ${TODAY})) as revenue_month,
-        (select coalesce(sum(fee), 0) from collaborations co where status in (${REVENUE_COLLAB_SQL})
-           and date_trunc('year', ${REVENUE_DATE_SQL}) = date_trunc('year', ${TODAY})) as revenue_year`),
+        (select coalesce(sum(agency_fee), 0) from collab_finance where status in (${REVENUE_COLLAB_SQL}))
+          + (select coalesce(sum(price), 0) from media_projects where status not in ('Anfrage', 'Angebot gesendet', 'Abgebrochen')) as revenue_total,
+        (select coalesce(sum(agency_fee), 0) from collab_finance where status in (${REVENUE_COLLAB_SQL})
+           and date_trunc('month', rev_date) = date_trunc('month', ${TODAY}))
+          + (select coalesce(sum(price), 0) from media_projects where status not in ('Anfrage', 'Angebot gesendet', 'Abgebrochen')
+           and date_trunc('month', coalesce((shoot_at at time zone 'Europe/Berlin')::date, delivery_date, created_at::date)) = date_trunc('month', ${TODAY})) as revenue_month,
+        (select coalesce(sum(agency_fee), 0) from collab_finance where status in (${REVENUE_COLLAB_SQL})
+           and date_trunc('year', rev_date) = date_trunc('year', ${TODAY}))
+          + (select coalesce(sum(price), 0) from media_projects where status not in ('Anfrage', 'Angebot gesendet', 'Abgebrochen')
+           and date_trunc('year', coalesce((shoot_at at time zone 'Europe/Berlin')::date, delivery_date, created_at::date)) = date_trunc('year', ${TODAY})) as revenue_year`),
       q(`select * from (
            select distinct on (o.creator_id) o.id, o.creator_id, c.display_name as creator_name, o.occurred_at, o.channel, o.result, u.name as user_name
            from outreach_activities o join creators c on c.id = o.creator_id left join users u on u.id = o.user_id

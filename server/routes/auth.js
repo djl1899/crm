@@ -133,15 +133,16 @@ export default function register(route) {
     const data = validate(await readJson(req), {
       name: v.str({ label: 'Name', required: true, max: 120 }),
       email: v.email({ required: true }),
+      digest_enabled: v.bool({ label: 'Tägliche Mail' }),
     }, { partial: true });
     if (data.email) {
       const dup = await one(`select id from users where lower(email) = $1 and id <> $2`, [data.email, user.id]);
       if (dup) throw new HttpError(409, 'Diese E-Mail-Adresse wird bereits verwendet.', { email: 'Bereits vergeben.' });
     }
     const updated = await one(
-      `update users set name = coalesce($2, name), email = coalesce($3, email), updated_at = now()
+      `update users set name = coalesce($2, name), email = coalesce($3, email), digest_enabled = coalesce($4, digest_enabled), updated_at = now()
        where id = $1 returning ${PUBLIC_USER_FIELDS}`,
-      [user.id, data.name ?? null, data.email ?? null]
+      [user.id, data.name ?? null, data.email ?? null, data.digest_enabled ?? null]
     );
     return { user: updated };
   });

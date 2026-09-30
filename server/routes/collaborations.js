@@ -2,7 +2,7 @@ import { q, one, TODAY } from '../db.js';
 import { HttpError, readJson, idParam, intParam, json } from '../http.js';
 import { v, validate, assertDateRange } from '../validate.js';
 import { logActivity } from '../activity.js';
-import { COLLAB_STATUSES, INVOICE_STATUSES } from '../../shared/constants.js';
+import { COLLAB_STATUSES, INVOICE_STATUSES, PAYOUT_STATUSES, MEDIA_REVENUE_EXCLUDED } from '../../shared/constants.js';
 import { ACTIVE_COLLAB_SQL, REVENUE_COLLAB_SQL } from './creators.js';
 
 const collabSchema = {
@@ -18,8 +18,13 @@ const collabSchema = {
   deadline: v.date({ label: 'Deadline' }),
   fee: v.num({ label: 'Vergütung' }),
   invoice_status: v.oneOf(INVOICE_STATUSES, { label: 'Rechnungsstatus', def: 'Nicht erstellt' }),
+  commission_rate: v.num({ label: 'Provision (%)', max: 100 }),
+  payout_status: v.oneOf(PAYOUT_STATUSES, { label: 'Auszahlung an Creator', def: 'Offen' }),
   notes: v.str({ label: 'Notizen', max: 10000 }),
 };
+
+const MEDIA_EXCL_SQL = MEDIA_REVENUE_EXCLUDED.map((x) => `'${x}'`).join(',');
+const MEDIA_DATE_SQL = `coalesce((m.shoot_at at time zone 'Europe/Berlin')::date, m.delivery_date, m.created_at::date)`;
 
 export const TIMEFRAME_SQL = `case
   when co.status in ('Abgeschlossen', 'Abgebrochen') or co.end_date < ${TODAY} then 'past'
@@ -30,10 +35,12 @@ export const REVENUE_DATE_SQL = `coalesce(co.start_date, co.deadline, co.end_dat
 
 const SELECT = `
   select co.*, c.display_name as creator_name, c.status as creator_status,
+    f.rate as commission_effective, f.agency_fee, f.payout, c.commission_rate as creator_commission_rate,
     ${TIMEFRAME_SQL} as timeframe,
     (co.status in (${REVENUE_COLLAB_SQL})) as counts_as_revenue,
     (select count(*)::int from tasks t where t.collaboration_id = co.id and t.status in ('Offen', 'In Bearbeitung', 'Wartet auf Creator')) as open_tasks
-  from collaborations co join creators c on c.id = co.creator_id`;
+  from collaborations co join creators c on c.id = co.creator_id
+  join collab_finance f on f.id = co.id`;
 
 export default function register(route) {
   route('GET', '/collaborations', async ({ query }) => {
@@ -127,33 +134,60 @@ export default function register(route) {
   });
 
   // Finanzübersicht (bewusst einfach)
+  // Finanzübersicht: Agenturumsatz = Provision aus Kooperationen + Media-Produktion
   route('GET', '/finance/summary', async () => {
-    const totals = await one(
+    const inMonth = (d) => `date_trunc('month', ${d}) = date_trunc('month', ${TODAY})`;
+    const inYear = (d) => `date_trunc('year', ${d}) = date_trunc('year', ${TODAY})`;
+    const c = await one(
       `select
-        coalesce(sum(fee), 0) as total,
-        coalesce(sum(fee) filter (where date_trunc('month', ${REVENUE_DATE_SQL}) = date_trunc('month', ${TODAY})), 0) as month,
-        coalesce(sum(fee) filter (where date_trunc('year', ${REVENUE_DATE_SQL}) = date_trunc('year', ${TODAY})), 0) as year,
+        coalesce(sum(fee), 0) as volume,
+        coalesce(sum(fee) filter (where ${inMonth('rev_date')}), 0) as volume_month,
+        coalesce(sum(fee) filter (where ${inYear('rev_date')}), 0) as volume_year,
+        coalesce(sum(agency_fee), 0) as agency_total,
+        coalesce(sum(agency_fee) filter (where ${inMonth('rev_date')}), 0) as agency_month,
+        coalesce(sum(agency_fee) filter (where ${inYear('rev_date')}), 0) as agency_year,
         coalesce(sum(fee) filter (where invoice_status = 'Bezahlt'), 0) as paid,
         coalesce(sum(fee) filter (where invoice_status in ('Offen', 'Eingereicht')), 0) as open,
         coalesce(sum(fee) filter (where invoice_status = 'Überfällig'), 0) as overdue,
-        coalesce(sum(fee) filter (where invoice_status = 'Nicht erstellt'), 0) as not_invoiced
-       from collaborations co where co.status in (${REVENUE_COLLAB_SQL})`
+        coalesce(sum(payout) filter (where payout_status = 'Offen'), 0) as payout_open,
+        coalesce(sum(payout) filter (where payout_status = 'Offen' and invoice_status = 'Bezahlt'), 0) as payout_due,
+        coalesce(sum(payout) filter (where payout_status = 'Ausgezahlt'), 0) as payout_done
+       from collab_finance where status in (${REVENUE_COLLAB_SQL})`
     );
+    const m = await one(
+      `select coalesce(sum(price), 0) as total,
+         coalesce(sum(price) filter (where ${inMonth(MEDIA_DATE_SQL)}), 0) as month,
+         coalesce(sum(price) filter (where ${inYear(MEDIA_DATE_SQL)}), 0) as year
+       from media_projects m where m.status not in (${MEDIA_EXCL_SQL})`
+    );
+    const r2 = (x) => Math.round(x * 100) / 100;
+    const totals = {
+      ...c,
+      media_total: m.total, media_month: m.month, media_year: m.year,
+      total: r2(c.agency_total + m.total), month: r2(c.agency_month + m.month), year: r2(c.agency_year + m.year),
+    };
     const byMonth = await q(
-      `select to_char(date_trunc('month', ${REVENUE_DATE_SQL}), 'YYYY-MM') as month, coalesce(sum(fee), 0) as revenue
-       from collaborations co
-       where co.status in (${REVENUE_COLLAB_SQL}) and ${REVENUE_DATE_SQL} >= date_trunc('month', ${TODAY}) - interval '11 months'
-         and ${REVENUE_DATE_SQL} < date_trunc('month', ${TODAY}) + interval '1 month'
-       group by 1 order by 1`
+      `select month, sum(revenue) as revenue, sum(agency) as agency, sum(media) as media from (
+         select to_char(date_trunc('month', rev_date), 'YYYY-MM') as month, agency_fee as revenue, agency_fee as agency, 0 as media
+         from collab_finance where status in (${REVENUE_COLLAB_SQL})
+         union all
+         select to_char(date_trunc('month', ${MEDIA_DATE_SQL}), 'YYYY-MM'), price, 0, price
+         from media_projects m where m.status not in (${MEDIA_EXCL_SQL})
+       ) x
+       where month >= to_char(date_trunc('month', ${TODAY}) - interval '11 months', 'YYYY-MM')
+         and month <= to_char(${TODAY}, 'YYYY-MM')
+       group by month order by month`
     );
     const byCreator = await q(
       `select c.id, c.display_name, c.status,
-        coalesce(sum(co.fee) filter (where co.status in (${REVENUE_COLLAB_SQL})), 0) as revenue,
-        coalesce(sum(co.fee) filter (where co.status in (${REVENUE_COLLAB_SQL}) and co.invoice_status = 'Bezahlt'), 0) as paid,
-        coalesce(sum(co.fee) filter (where co.status in (${REVENUE_COLLAB_SQL}) and co.invoice_status in ('Offen', 'Eingereicht', 'Überfällig')), 0) as open,
-        count(co.id)::int as collab_count
-       from creators c join collaborations co on co.creator_id = c.id
-       group by c.id order by revenue desc limit 100`
+        coalesce(sum(f.fee), 0) as volume,
+        coalesce(sum(f.agency_fee), 0) as agency,
+        coalesce(sum(f.payout) filter (where f.payout_status = 'Offen'), 0) as payout_open,
+        coalesce(sum(f.fee) filter (where f.invoice_status = 'Bezahlt'), 0) as paid,
+        count(f.id)::int as collab_count
+       from creators c join collab_finance f on f.creator_id = c.id
+       where f.status in (${REVENUE_COLLAB_SQL})
+       group by c.id order by agency desc limit 100`
     );
     return { totals, by_month: byMonth, by_creator: byCreator };
   });

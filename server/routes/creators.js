@@ -32,13 +32,15 @@ export const creatorSchema = {
   status: v.oneOf(CREATOR_STATUSES, { label: 'Creator Status', def: 'Lead' }),
   outreach_status: v.oneOf(OUTREACH_STATUSES, { label: 'Outreach Status', def: 'Noch nicht kontaktiert' }),
   contacted: v.bool({ label: 'Bereits angeschrieben' }),
+  commission_rate: v.num({ label: 'Provision (%)', max: 100 }),
+  bio: v.str({ label: 'Kurzvorstellung', max: 1500 }),
 };
 const CREATOR_COLUMNS = Object.keys(creatorSchema);
 
 const FIELD_LABELS = {
   display_name: 'Name', first_name: 'Vorname', last_name: 'Nachname', email: 'E-Mail', phone: 'Telefon',
   city: 'Ort', region: 'Region', country: 'Land', language: 'Sprache', niche: 'Nische', interests: 'Interessen',
-  notes: 'Notizen',
+  notes: 'Notizen', commission_rate: 'Provision', bio: 'Kurzvorstellung',
 };
 
 function normalizeUsername(raw) {
@@ -289,6 +291,8 @@ export default function register(route) {
         `select
           (select coalesce(sum(fee), 0) from collaborations where creator_id = $1 and status in (${REVENUE_COLLAB_SQL})) as total_revenue,
           (select coalesce(sum(fee), 0) from collaborations where creator_id = $1 and status in (${REVENUE_COLLAB_SQL}) and invoice_status = 'Bezahlt') as paid_revenue,
+          (select coalesce(sum(agency_fee), 0) from collab_finance where creator_id = $1 and status in (${REVENUE_COLLAB_SQL})) as agency_revenue,
+          (select coalesce(sum(payout), 0) from collab_finance where creator_id = $1 and status in (${REVENUE_COLLAB_SQL}) and payout_status = 'Offen') as payout_open,
           (select coalesce(sum(fee), 0) from collaborations where creator_id = $1 and status in (${REVENUE_COLLAB_SQL}) and invoice_status in ('Offen', 'Eingereicht', 'Überfällig')) as open_invoices,
           (select count(*)::int from collaborations where creator_id = $1) as collab_count,
           (select count(*)::int from collaborations where creator_id = $1 and status in (${ACTIVE_COLLAB_SQL})) as active_collabs,
@@ -424,5 +428,105 @@ export default function register(route) {
       [id, limit]
     );
     return { items: rows };
+  });
+
+  // ---------- CSV-Import (Zeilen kommen bereits aus dem Browser zerlegt an) ----------
+  route('POST', '/creators/import', async ({ req, user }) => {
+    const body = await readJson(req);
+    const rows = Array.isArray(body.rows) ? body.rows : [];
+    if (!rows.length) throw new HttpError(422, 'Keine Zeilen zum Importieren.');
+    if (rows.length > 200) throw new HttpError(422, 'Bitte höchstens 200 Zeilen pro Anfrage senden.');
+    const skipDuplicates = body.skip_duplicates !== false;
+    const offset = Number(body.offset) || 0;
+
+    const users = await q(`select id, lower(name) as name, lower(email) as email from users`);
+    const tagRows = await q(`select id, lower(name) as name from tags`);
+    const tagMap = new Map(tagRows.map((t) => [t.name, t.id]));
+    const result = { created: 0, skipped: [], errors: [] };
+
+    const parseCount = (val) => {
+      if (val === undefined || val === null || String(val).trim() === '') return null;
+      let s = String(val).trim().toLowerCase().replace(/\s/g, '');
+      let mult = 1;
+      if (/(mio|m)$/.test(s)) { mult = 1_000_000; s = s.replace(/(mio\.?|m)$/, ''); }
+      else if (/(tsd|k)$/.test(s)) { mult = 1000; s = s.replace(/(tsd\.?|k)$/, ''); }
+      if (mult > 1) s = s.replace(',', '.');
+      else s = s.replace(/[.,](?=\d{3}(\D|$))/g, '').replace(',', '.');
+      const n = Number(s) * mult;
+      return Number.isFinite(n) ? Math.round(n) : val;
+    };
+
+    for (let i = 0; i < rows.length; i++) {
+      const raw = rows[i] || {};
+      const line = offset + i + 2; // +2: Kopfzeile + 1-basiert
+      const name = String(raw.display_name || [raw.first_name, raw.last_name].filter(Boolean).join(' ') || raw.instagram || raw.tiktok || '').trim();
+      try {
+        const input = {
+          display_name: name,
+          first_name: raw.first_name, last_name: raw.last_name, email: raw.email, phone: raw.phone,
+          city: raw.city, region: raw.region, country: raw.country, language: raw.language,
+          niche: raw.niche, interests: raw.interests, notes: raw.notes,
+          status: CREATOR_STATUSES.find((st) => st.toLowerCase() === String(raw.status || '').trim().toLowerCase()) || 'Lead',
+          outreach_status: 'Noch nicht kontaktiert', contacted: false,
+          commission_rate: raw.commission_rate,
+        };
+        const m = String(raw.manager || '').trim().toLowerCase();
+        if (m) {
+          const u = users.find((x) => x.email === m || x.name === m || x.name.split(' ')[0] === m);
+          if (u) input.manager_id = u.id;
+        }
+        const data = validate(input, creatorSchema);
+        const socials = validateSocials({
+          instagram: raw.instagram || raw.instagram_followers ? { username: raw.instagram, followers: parseCount(raw.instagram_followers), url: raw.instagram_url } : null,
+          tiktok: raw.tiktok || raw.tiktok_followers ? { username: raw.tiktok, followers: parseCount(raw.tiktok_followers), url: raw.tiktok_url } : null,
+        });
+
+        if (skipDuplicates) {
+          const ig = socials.instagram?.username?.toLowerCase();
+          const tt = socials.tiktok?.username?.toLowerCase();
+          const dup = await one(
+            `select c.id, c.display_name from creators c
+             where lower(c.display_name) = lower($1)
+                or ($2::text is not null and lower(c.email) = $2)
+                or ($3::text is not null and exists (select 1 from social_accounts s where s.creator_id = c.id and s.platform = 'instagram' and lower(s.username) = $3))
+                or ($4::text is not null and exists (select 1 from social_accounts s where s.creator_id = c.id and s.platform = 'tiktok' and lower(s.username) = $4))
+             limit 1`,
+            [data.display_name, data.email, ig || null, tt || null]
+          );
+          if (dup) {
+            result.skipped.push({ line, name: data.display_name, reason: `bereits vorhanden („${dup.display_name}“)` });
+            continue;
+          }
+        }
+
+        const tagIds = [];
+        for (const tn of String(raw.tags || '').split(/[,;|]/).map((x) => x.trim()).filter(Boolean).slice(0, 20)) {
+          let tid = tagMap.get(tn.toLowerCase());
+          if (!tid) {
+            const t = await one(`insert into tags (name) values ($1) on conflict (lower(name)) do update set name = tags.name returning id`, [tn.slice(0, 40)]);
+            tid = t.id;
+            tagMap.set(tn.toLowerCase(), tid);
+          }
+          tagIds.push(tid);
+        }
+
+        await tx(async (run) => {
+          const cols = [...CREATOR_COLUMNS, 'created_by'];
+          const created = await run(
+            `insert into creators (${cols.join(', ')}) values (${cols.map((_, k) => `$${k + 1}`).join(', ')}) returning id`,
+            [...CREATOR_COLUMNS.map((k) => data[k] ?? null), user.id]
+          );
+          const id = created[0].id;
+          await saveSocials(run, id, socials);
+          await saveTags(run, id, tagIds);
+          await logActivity({ creatorId: id, userId: user.id, entityType: 'creator', entityId: id, action: 'creator_created', message: `hat den Creator „${data.display_name}“ per CSV-Import angelegt.` }, run);
+        });
+        result.created++;
+      } catch (err) {
+        if (err instanceof HttpError) result.errors.push({ line, name: name || '(ohne Name)', reason: err.message });
+        else throw err;
+      }
+    }
+    return result;
   });
 }
