@@ -15,6 +15,8 @@ const NAV = [
   { to: '/contracts', label: 'Verträge & Dokumente', icon: 'file' },
   { to: '/finance', label: 'Finanzen', icon: 'euro' },
   { to: '/media', label: 'Media Produktion', icon: 'camera' },
+  { section: 'Produkt' },
+  { to: '/app', label: 'App', icon: 'phoneApp' },
   { section: 'Verwaltung' },
   { to: '/users', label: 'Benutzer', icon: 'shield' },
   { to: '/settings', label: 'Einstellungen', icon: 'settings' },
