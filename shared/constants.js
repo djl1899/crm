@@ -63,6 +63,16 @@ export const MEDIA_STATUSES = [
 export const MEDIA_CLOSED_STATUSES = ['Abgeschlossen', 'Abgebrochen'];
 export const MEDIA_TYPES = ['Social Media Content', 'Reel / TikTok', 'Imagefilm', 'Werbespot', 'Fotoshooting', 'Event', 'Hochzeit', 'Produktfotos', 'Sonstiges'];
 
+// Bereich "App" (Marktplatz-App, getrennt vom CRM)
+export const APP_INFLUENCER_STATUSES = ['Interessent', 'Warteliste', 'Beta-Tester', 'Aktiv', 'Inaktiv'];
+export const APP_COMPANY_STATUSES = ['Lead', 'Im Gespräch', 'Pilotkunde', 'Zahlender Kunde', 'Abgesprungen'];
+export const APP_CAMPAIGN_STATUSES = ['Entwurf', 'Matching', 'Aktiv', 'Abgeschlossen', 'Abgebrochen'];
+export const APP_ASSIGNMENT_STATUSES = ['Vorgeschlagen', 'Angefragt', 'Zugesagt', 'Content geliefert', 'Bezahlt', 'Abgesagt'];
+export const APP_ROADMAP_STATUSES = ['Idee', 'Geplant', 'In Arbeit', 'Test', 'Fertig'];
+export const APP_ROADMAP_AREAS = ['Influencer-App', 'Firmen-Portal', 'KI-Matching', 'Backend', 'Design', 'Marketing', 'Recht & Finanzen'];
+export const APP_UPDATE_TYPES = ['Meilenstein', 'Release', 'Feature', 'Bugfix', 'Notiz'];
+export const APP_PLATFORMS = ['Instagram', 'TikTok', 'YouTube', 'Sonstiges'];
+
 export const INVOICE_STATUSES = ['Nicht erstellt', 'Offen', 'Eingereicht', 'Bezahlt', 'Überfällig'];
 
 export const TASK_STATUSES = ['Offen', 'In Bearbeitung', 'Wartet auf Creator', 'Erledigt', 'Abgebrochen'];
