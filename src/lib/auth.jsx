@@ -22,8 +22,15 @@ export function AuthProvider({ children }) {
     setUnauthorizedHandler(() => setState((s) => ({ ...s, user: null })));
   }, [refresh]);
 
+  // Gibt { twofa_required, challenge } zurück, wenn ein Code vom Handy nötig ist.
   const login = async (email, password) => {
-    const { user } = await api.post('/auth/login', { email, password });
+    const res = await api.post('/auth/login', { email, password });
+    if (res.twofa_required) return res;
+    setState((s) => ({ ...s, user: res.user, needsSetup: false }));
+    return {};
+  };
+  const loginTwoFactor = async (challenge, code, remember) => {
+    const { user } = await api.post('/auth/login/2fa', { challenge, code, remember });
     setState((s) => ({ ...s, user, needsSetup: false }));
   };
   const setup = async (payload) => {
@@ -37,7 +44,7 @@ export function AuthProvider({ children }) {
   };
   const setUser = (user) => setState((s) => ({ ...s, user }));
 
-  return <AuthCtx.Provider value={{ ...state, login, setup, logout, refresh, setUser }}>{children}</AuthCtx.Provider>;
+  return <AuthCtx.Provider value={{ ...state, login, loginTwoFactor, setup, logout, refresh, setUser }}>{children}</AuthCtx.Provider>;
 }
 
 // Häufig benötigte Stammdaten (Benutzer & Tags)
