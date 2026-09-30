@@ -53,6 +53,18 @@ export default function register(route) {
       const dup = await one(`select id from users where lower(email) = $1 and id <> $2`, [data.email, id]);
       if (dup) throw new HttpError(409, 'Diese E-Mail-Adresse wird bereits verwendet.', { email: 'Bereits vergeben.' });
     }
+    // Zwei-Faktor zurücksetzen (z. B. Handy verloren)
+    if (body.reset_2fa === true) {
+      await q(
+        `update users set totp_enabled = false, totp_secret = null, totp_pending = null, totp_last_step = null,
+           recovery_codes = '{}', token_version = token_version + 1 where id = $1`,
+        [id]
+      );
+      await logActivity({ userId: user.id, entityType: 'user', entityId: id, action: '2fa_reset', message: `hat die Zwei-Faktor-Anmeldung von „${existing.name}“ zurückgesetzt.` });
+      if (Object.keys(data).length === 0 && !body.password) {
+        return { user: await one(`select ${PUBLIC_USER_FIELDS} from users where id = $1`, [id]) };
+      }
+    }
     let passwordHash = null;
     if (body.password) {
       validatePasswordStrength(body.password);
