@@ -3,12 +3,15 @@ import { api, qs } from '../lib/api.js';
 import { useApi, useForm, invalidateAll, useDebounced } from '../lib/useApi.js';
 import { useLookups, useAuth } from '../lib/auth.jsx';
 import { toLocalInput, fmtBytes } from '../lib/format.js';
+import { renderTemplate } from '../lib/templates.js';
 import { Modal, Button, Field, Select, TagChip, useUi, handleFormError } from './ui.jsx';
 import { Icon } from './Icon.jsx';
 import {
   OUTREACH_CHANNELS, OUTREACH_STATUSES, OUTREACH_RESULT_SUGGESTIONS, COLLAB_STATUSES, INVOICE_STATUSES,
-  TASK_STATUSES, TASK_PRIORITIES, DOCUMENT_CATEGORIES, MAX_UPLOAD_BYTES, ALLOWED_UPLOAD_TYPES,
+  TASK_STATUSES, TASK_PRIORITIES, DOCUMENT_CATEGORIES, MAX_UPLOAD_BYTES, ALLOWED_UPLOAD_TYPES, PAYOUT_STATUSES,
 } from '../../shared/constants.js';
+
+const fmtMoneyLocal = (n) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(Number.isFinite(n) ? n : 0);
 
 const ACCEPT = Object.values(ALLOWED_UPLOAD_TYPES).flat().map((e) => '.' + e).join(',');
 
@@ -181,6 +184,39 @@ export function OutreachModal({ open, onClose, creator, activity }) {
     });
   }, [open]); // eslint-disable-line
 
+  const templates = useApi(open && !activity ? '/templates' : null);
+  const [tplId, setTplId] = useState('');
+  const [igHandle, setIgHandle] = useState(null);
+  useEffect(() => { if (open) { setTplId(''); setIgHandle(null); } }, [open]);
+  const applyTemplate = async (id) => {
+    setTplId(id);
+    const tpl = (templates.data?.items || []).find((t) => String(t.id) === String(id));
+    if (!tpl) return;
+    const cid = f.values.creator_id;
+    let ctx = { me: user };
+    if (cid) {
+      try {
+        const prof = await api.get(`/creators/${cid}`);
+        ctx = { creator: prof.creator, socials: prof.socials, me: user };
+        setIgHandle(prof.socials?.instagram?.username || null);
+      } catch { /* ignorieren */ }
+    }
+    f.setValues((x) => ({
+      ...x,
+      subject: tpl.subject ? renderTemplate(tpl.subject, ctx) : x.subject || tpl.name,
+      message: renderTemplate(tpl.body, ctx),
+      channel: tpl.channel || x.channel,
+    }));
+  };
+  const copyMessage = async () => {
+    try {
+      await navigator.clipboard.writeText(f.values.message || '');
+      toast('Nachricht kopiert – jetzt einfügen und senden.');
+    } catch {
+      toast('Kopieren nicht möglich – bitte Text markieren und kopieren.', 'error');
+    }
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -220,6 +256,12 @@ export function OutreachModal({ open, onClose, creator, activity }) {
       }
     >
       <form id="outreach-form" className="form-grid" onSubmit={submit}>
+        {!activity && (templates.data?.items || []).length > 0 && (
+          <Field label="Vorlage verwenden" className="span-2" hint={!v.creator_id ? 'Tipp: zuerst den Creator wählen, dann werden {Vorname} usw. ausgefüllt.' : undefined}>
+            <Select value={tplId} onChange={(e) => applyTemplate(e.target.value)} placeholder="– keine Vorlage –"
+              options={(templates.data?.items || []).map((t) => ({ value: String(t.id), label: t.name + (t.channel ? ` (${t.channel})` : '') }))} />
+          </Field>
+        )}
         {!creator && !activity && (
           <Field label="Creator" required error={f.errors.creator_id} className="span-2">
             <CreatorPicker value={v.creator_id} autoFocus onChange={(id, label) => f.setValues((x) => ({ ...x, creator_id: id, creator_label: label }))} />
@@ -242,7 +284,17 @@ export function OutreachModal({ open, onClose, creator, activity }) {
           <input className="input" value={v.subject || ''} onChange={f.set('subject')} placeholder="z. B. Kampagne X angefragt" />
         </Field>
         <Field label="Nachricht / Notiz" error={f.errors.message} className="span-2">
-          <textarea className="input" rows={4} value={v.message || ''} onChange={f.set('message')} />
+          <textarea className="input" rows={tplId ? 8 : 4} value={v.message || ''} onChange={f.set('message')} />
+          {v.message && (
+            <div className="msg-actions">
+              <Button size="sm" icon="note" onClick={copyMessage}>Nachricht kopieren</Button>
+              {igHandle && v.channel === 'Instagram DM' && (
+                <a className="btn btn-secondary btn-sm" href={`https://ig.me/m/${igHandle}`} target="_blank" rel="noopener noreferrer">
+                  <Icon name="instagram" size={15} /> <span>DM an @{igHandle} öffnen</span>
+                </a>
+              )}
+            </div>
+          )}
         </Field>
         <Field label="Nächster Follow-up-Termin" error={f.errors.follow_up_date} hint="Optional – erscheint dann im Dashboard.">
           <input type="date" className="input" value={v.follow_up_date || ''} onChange={f.set('follow_up_date')} />
@@ -272,6 +324,7 @@ export function CollaborationModal({ open, onClose, creator, collaboration, onSa
       brand: c.brand || '', campaign_name: c.campaign_name || '', start_date: c.start_date || '', end_date: c.end_date || '',
       status: c.status || 'Anfrage', platform: c.platform || '', description: c.description || '', deliverables: c.deliverables || '',
       deadline: c.deadline || '', fee: c.fee ?? '', invoice_status: c.invoice_status || 'Nicht erstellt', notes: c.notes || '',
+      commission_rate: c.commission_rate ?? '', payout_status: c.payout_status || 'Offen',
     });
   }, [open]); // eslint-disable-line
 
@@ -293,6 +346,13 @@ export function CollaborationModal({ open, onClose, creator, collaboration, onSa
     }
   };
   const v = f.values;
+  const settings = useApi(open ? '/settings' : null);
+  const globalRate = settings.data?.settings.default_commission_rate ?? 20;
+  const fallbackRate = Number(
+    (collaboration ? collaboration.creator_commission_rate : creator?.commission_rate) ?? globalRate
+  );
+  const fee = Number(v.fee) || 0;
+  const rate = v.commission_rate === '' || v.commission_rate === null || v.commission_rate === undefined ? Number(fallbackRate) : Number(v.commission_rate);
   return (
     <Modal
       open={open}
@@ -338,10 +398,16 @@ export function CollaborationModal({ open, onClose, creator, collaboration, onSa
         <Field label="Vergütung (€)" error={f.errors.fee}>
           <input type="number" min="0" step="0.01" className="input" value={v.fee ?? ''} onChange={f.set('fee')} placeholder="0" />
         </Field>
-        <Field label="Rechnungsstatus" error={f.errors.invoice_status}>
+        <Field label="Rechnungsstatus (Brand)" error={f.errors.invoice_status}>
           <Select value={v.invoice_status} onChange={f.set('invoice_status')} options={INVOICE_STATUSES} />
         </Field>
-        <div />
+        <Field label="Agenturprovision (%)" error={f.errors.commission_rate}
+          hint={`Leer = Standard (${fallbackRate} %). Provision ${fmtMoneyLocal(fee * rate / 100)} · an Creator ${fmtMoneyLocal(fee - fee * rate / 100)}`}>
+          <input type="number" min="0" max="100" step="0.5" className="input" value={v.commission_rate ?? ''} onChange={f.set('commission_rate')} placeholder={`${fallbackRate}`} />
+        </Field>
+        <Field label="Auszahlung an Creator" error={f.errors.payout_status}>
+          <Select value={v.payout_status} onChange={f.set('payout_status')} options={PAYOUT_STATUSES} />
+        </Field>
         <Field label="Deliverables" error={f.errors.deliverables} className="span-2">
           <textarea className="input" rows={2} value={v.deliverables || ''} onChange={f.set('deliverables')} placeholder="z. B. 2 Reels, 3 Stories" />
         </Field>
