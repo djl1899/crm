@@ -24,7 +24,7 @@ export function UsersPage() {
       <Card padded={false}>
         <div className="table-wrap">
           <table className="table">
-            <thead><tr><th>Name</th><th>E-Mail</th><th>Rolle</th><th>Status</th><th>2FA</th><th className="num">Creator</th><th>Letzter Login</th><th>Erstellt</th>{isAdmin && <th />}</tr></thead>
+            <thead><tr><th>Name</th><th>E-Mail</th><th>Rolle</th><th>Status</th><th>2FA</th><th>Tägliche Mail</th><th className="num">Creator</th><th>Letzter Login</th><th>Erstellt</th>{isAdmin && <th />}</tr></thead>
             <tbody>
               {data.users.map((u) => (
                 <tr key={u.id} className={u.is_active ? '' : 'row-muted'}>
@@ -33,6 +33,7 @@ export function UsersPage() {
                   <td>{u.role === 'admin' ? <Badge tone="violet">Administrator</Badge> : <Badge tone="gray">Manager</Badge>}</td>
                   <td>{u.is_active ? <Badge tone="green" dot>Aktiv</Badge> : <Badge tone="muted" dot>Inaktiv</Badge>}</td>
                   <td>{u.totp_enabled ? <Badge tone="green">An</Badge> : <span className="muted">aus</span>}</td>
+                  <td>{u.digest_enabled ? <Badge tone="green">An</Badge> : <span className="muted">aus</span>}</td>
                   <td className="num">{u.creator_count}</td>
                   <td className="nowrap muted">{u.last_login_at ? fmtRelative(u.last_login_at) : 'noch nie'}</td>
                   <td className="nowrap muted">{fmtDate(u.created_at)}</td>
@@ -56,7 +57,7 @@ function UserModal({ open, item, onClose }) {
   useEffect(() => {
     if (!open) return;
     f.setErrors({});
-    f.setValues({ name: item?.name || '', email: item?.email || '', role: item?.role || 'manager', is_active: item ? item.is_active : true, password: '' });
+    f.setValues({ name: item?.name || '', email: item?.email || '', role: item?.role || 'manager', is_active: item ? item.is_active : true, digest_enabled: item ? !!item.digest_enabled : true, password: '' });
   }, [open]); // eslint-disable-line
   const v = f.values;
   const submit = async (e) => {
@@ -104,6 +105,11 @@ function UserModal({ open, item, onClose }) {
         <Field label="Status" error={f.errors.is_active}>
           <Select value={v.is_active ? 'true' : 'false'} onChange={(e) => f.setValues((x) => ({ ...x, is_active: e.target.value === 'true' }))}
             options={[{ value: 'true', label: 'Aktiv' }, { value: 'false', label: 'Inaktiv' }]} disabled={self} />
+        </Field>
+        <Field label="Tägliche Zusammenfassung per Mail" error={f.errors.digest_enabled} className="span-2"
+          hint={`Jeden Morgen um ca. 7 Uhr an ${v.email || 'die E-Mail-Adresse oben'} – mit den eigenen Aufgaben, Follow-ups, Drehs und Deadlines.`}>
+          <Select value={v.digest_enabled ? 'true' : 'false'} onChange={(e) => f.setValues((x) => ({ ...x, digest_enabled: e.target.value === 'true' }))}
+            options={[{ value: 'true', label: 'An' }, { value: 'false', label: 'Aus' }]} />
         </Field>
         <Field label={item ? 'Neues Passwort (optional)' : 'Passwort'} required={!item} error={f.errors.password} className="span-2"
           hint={item ? 'Leer lassen, um das Passwort nicht zu ändern. Setzen meldet den Benutzer überall ab.' : 'Mindestens 8 Zeichen. Teile es dem Benutzer sicher mit.'}>
