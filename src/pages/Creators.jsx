@@ -194,8 +194,6 @@ export function CreatorsPage() {
                   <SortTh k="status">Status</SortTh>
                   <th>Outreach</th>
                   <th>Notizen</th>
-                  <th>Nische</th>
-                  <th>Region</th>
                   <th>Manager</th>
                   <SortTh k="last_activity" className="nowrap">Letzte Aktivität</SortTh>
                 </tr>
@@ -224,8 +222,6 @@ export function CreatorsPage() {
                     <td className="notes-cell" onClick={(e) => { e.stopPropagation(); setNoteCreator(c); }} title={c.notes ? 'Klicken zum Bearbeiten' : 'Notiz hinzufügen'}>
                       {c.notes ? <div className="notes-preview">{c.notes}</div> : <span className="notes-add"><Icon name="plus" size={13} /> Notiz</span>}
                     </td>
-                    <td className="clip">{c.niche || <span className="muted">–</span>}</td>
-                    <td className="clip">{c.region || c.city || <span className="muted">–</span>}{c.country && c.country !== 'Deutschland' ? <div className="cell-sub muted">{c.country}</div> : null}</td>
                     <td className="clip">{c.manager_name || <span className="muted">–</span>}</td>
                     <td className="nowrap muted" title={fmtDateTime(c.last_activity_at)}>{fmtRelative(c.last_activity_at)}</td>
                   </tr>
