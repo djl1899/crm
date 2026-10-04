@@ -10,6 +10,7 @@ const userSchema = {
   email: v.email({ required: true }),
   role: v.oneOf(ROLE_KEYS, { label: 'Rolle', def: 'manager' }),
   is_active: v.bool({ label: 'Status' }),
+  digest_enabled: v.bool({ label: 'Tägliche Zusammenfassung' }),
 };
 
 export default function register(route) {
@@ -31,9 +32,9 @@ export default function register(route) {
     const dup = await one(`select id from users where lower(email) = $1`, [data.email]);
     if (dup) throw new HttpError(409, 'Diese E-Mail-Adresse wird bereits verwendet.', { email: 'Bereits vergeben.' });
     const created = await one(
-      `insert into users (name, email, password_hash, role, is_active) values ($1, $2, $3, $4, $5)
+      `insert into users (name, email, password_hash, role, is_active, digest_enabled) values ($1, $2, $3, $4, $5, $6)
        returning ${PUBLIC_USER_FIELDS}`,
-      [data.name, data.email, await hashPassword(body.password), data.role, data.is_active]
+      [data.name, data.email, await hashPassword(body.password), data.role, data.is_active, data.digest_enabled ?? false]
     );
     await logActivity({ userId: user.id, entityType: 'user', entityId: created.id, action: 'user_created', message: `hat den Benutzer „${created.name}“ angelegt.` });
     return { user: created };
@@ -77,15 +78,17 @@ export default function register(route) {
          role = coalesce($4, role),
          is_active = coalesce($5, is_active),
          password_hash = coalesce($6, password_hash),
+         digest_enabled = coalesce($7, digest_enabled),
          token_version = token_version + (case when $6::text is not null or $5::boolean = false then 1 else 0 end),
          updated_at = now()
        where id = $1 returning ${PUBLIC_USER_FIELDS}`,
-      [id, data.name ?? null, data.email ?? null, data.role ?? null, data.is_active ?? null, passwordHash]
+      [id, data.name ?? null, data.email ?? null, data.role ?? null, data.is_active ?? null, passwordHash, data.digest_enabled ?? null]
     );
     const changes = [];
     if (data.role && data.role !== existing.role) changes.push(`Rolle → ${data.role === 'admin' ? 'Administrator' : 'Manager'}`);
     if (data.is_active !== undefined && data.is_active !== existing.is_active) changes.push(data.is_active ? 'aktiviert' : 'deaktiviert');
     if (passwordHash) changes.push('Passwort zurückgesetzt');
+    if (data.digest_enabled !== undefined && data.digest_enabled !== existing.digest_enabled) changes.push(`Tägliche Mail ${data.digest_enabled ? 'an' : 'aus'}`);
     await logActivity({
       userId: user.id, entityType: 'user', entityId: id, action: 'user_updated',
       message: `hat den Benutzer „${updated.name}“ geändert${changes.length ? ` (${changes.join(', ')})` : ''}.`,
