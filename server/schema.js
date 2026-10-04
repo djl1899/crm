@@ -362,6 +362,14 @@ const MIGRATIONS = [
       updated_at timestamptz not null default now()
     )`,
   ],
+  // 7: Kleider- und Schuhgrößen
+  [
+    `alter table creators add column if not exists size_top text`,
+    `alter table creators add column if not exists size_bottom text`,
+    `alter table creators add column if not exists size_shoes text`,
+    `alter table creators add column if not exists height_cm integer`,
+    `alter table creators add column if not exists size_notes text`,
+  ],
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;
