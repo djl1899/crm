@@ -127,3 +127,19 @@ export const ALLOWED_UPLOAD_TYPES = {
   'application/zip': ['zip'],
 };
 export const AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
+// Konfektionsgrößen (Creator-Profil)
+const LETTER_SIZES = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
+export const SIZE_TOP_GROUPS = [
+  { label: 'Buchstaben', options: LETTER_SIZES },
+  { label: 'Konfektionsgröße (EU)', options: ['32', '34', '36', '38', '40', '42', '44', '46', '48', '50', '52', '54', '56'] },
+];
+export const SIZE_BOTTOM_GROUPS = [
+  { label: 'Buchstaben', options: LETTER_SIZES },
+  { label: 'Konfektionsgröße (EU)', options: ['32', '34', '36', '38', '40', '42', '44', '46', '48', '50', '52', '54', '56'] },
+  { label: 'Jeans (Bundweite)', options: ['W24', 'W25', 'W26', 'W27', 'W28', 'W29', 'W30', 'W31', 'W32', 'W33', 'W34', 'W36', 'W38', 'W40'] },
+];
+export const SHOE_SIZES = Array.from({ length: 29 }, (_, i) => {
+  const n = 35 + i / 2;
+  return Number.isInteger(n) ? String(n) : `${Math.floor(n)},5`;
+});
