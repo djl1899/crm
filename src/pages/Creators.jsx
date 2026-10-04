@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useApi, useDebounced } from '../lib/useApi.js';
+import { api } from '../lib/api.js';
+import { useApi, useDebounced, invalidateAll } from '../lib/useApi.js';
 import { useSearchParams, useNavigate, Link } from '../lib/router.jsx';
 import { useLookups } from '../lib/auth.jsx';
 import { qs } from '../lib/api.js';
-import { PageHeader, Button, Select, Avatar, StatusBadge, TagChip, Pagination, Spinner, ErrorBox, Empty, Badge } from '../components/ui.jsx';
+import { PageHeader, Button, Select, Avatar, StatusBadge, TagChip, Pagination, Spinner, ErrorBox, Empty, Badge, Modal, useUi } from '../components/ui.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { ImportModal } from '../components/ImportModal.jsx';
 import { fmtCompact, fmtNumber, fmtRelative, fmtDateTime } from '../lib/format.js';
@@ -33,6 +34,7 @@ export function CreatorsPage() {
   const debounced = useDebounced(search, 300);
   const [showAdvanced, setShowAdvanced] = useState(() => ADVANCED.some((k) => params.get(k)));
   const options = useApi('/creators/filter-options');
+  const [noteCreator, setNoteCreator] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
 
   useEffect(() => {
@@ -189,10 +191,11 @@ export function CreatorsPage() {
                   <SortTh k="name">Creator</SortTh>
                   <SortTh k="instagram_followers">Instagram</SortTh>
                   <SortTh k="tiktok_followers">TikTok</SortTh>
-                  <th>Nische</th>
-                  <th>Region</th>
                   <SortTh k="status">Status</SortTh>
                   <th>Outreach</th>
+                  <th>Notizen</th>
+                  <th>Nische</th>
+                  <th>Region</th>
                   <th>Manager</th>
                   <SortTh k="last_activity" className="nowrap">Letzte Aktivität</SortTh>
                 </tr>
@@ -214,12 +217,15 @@ export function CreatorsPage() {
                     </td>
                     <td><SocialCell username={c.instagram_username} followers={c.instagram_followers} /></td>
                     <td><SocialCell username={c.tiktok_username} followers={c.tiktok_followers} /></td>
-                    <td className="clip">{c.niche || <span className="muted">–</span>}</td>
-                    <td className="clip">{c.region || c.city || <span className="muted">–</span>}{c.country && c.country !== 'Deutschland' ? <div className="cell-sub muted">{c.country}</div> : null}</td>
                     <td><StatusBadge value={c.status} /></td>
                     <td>
                       <StatusBadge value={c.outreach_status} dot={false} />
                     </td>
+                    <td className="notes-cell" onClick={(e) => { e.stopPropagation(); setNoteCreator(c); }} title={c.notes ? 'Klicken zum Bearbeiten' : 'Notiz hinzufügen'}>
+                      {c.notes ? <div className="notes-preview">{c.notes}</div> : <span className="notes-add"><Icon name="plus" size={13} /> Notiz</span>}
+                    </td>
+                    <td className="clip">{c.niche || <span className="muted">–</span>}</td>
+                    <td className="clip">{c.region || c.city || <span className="muted">–</span>}{c.country && c.country !== 'Deutschland' ? <div className="cell-sub muted">{c.country}</div> : null}</td>
                     <td className="clip">{c.manager_name || <span className="muted">–</span>}</td>
                     <td className="nowrap muted" title={fmtDateTime(c.last_activity_at)}>{fmtRelative(c.last_activity_at)}</td>
                   </tr>
@@ -246,6 +252,7 @@ export function CreatorsPage() {
                     <div className="cell-sub muted">
                       {[c.region || c.city, c.outreach_status, c.manager_name].filter(Boolean).join(' · ')}
                     </div>
+                    {c.notes && <div className="notes-preview notes-preview-card">{c.notes}</div>}
                   </div>
                 </Link>
               </li>
@@ -255,6 +262,7 @@ export function CreatorsPage() {
         </div>
       ) : null}
       <ImportModal open={importOpen} onClose={() => setImportOpen(false)} />
+      <NotesModal creator={noteCreator} onClose={() => setNoteCreator(null)} />
     </div>
   );
 }
@@ -289,3 +297,39 @@ function NumberFilter({ value, onCommit, placeholder }) {
   );
 }
 
+
+function NotesModal({ creator, onClose }) {
+  const { toast } = useUi();
+  const [notes, setNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { if (creator) setNotes(creator.notes || ''); }, [creator]);
+  if (!creator) return null;
+  const dirty = notes !== (creator.notes || '');
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.patch(`/creators/${creator.id}`, { notes });
+      invalidateAll();
+      toast('Notizen gespeichert.');
+      onClose();
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <Modal
+      open
+      title={`Notizen – ${creator.display_name}`}
+      onClose={onClose}
+      footer={<>
+        <Button onClick={onClose}>Abbrechen</Button>
+        <Button variant="primary" onClick={save} loading={saving} disabled={!dirty}>Speichern</Button>
+      </>}
+    >
+      <textarea className="input notes-area" rows={10} autoFocus value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notizen zum Creator…" />
+      <p className="muted small" style={{ marginTop: 8 }}>Nur für das Team sichtbar · dieselben Notizen wie im Creator-Profil</p>
+    </Modal>
+  );
+}
