@@ -661,3 +661,11 @@ details summary { cursor: pointer; }
   .form-footer-mobile { display: block; }
   .table td, .table th { padding: 9px 10px; }
 }
+
+/* Notizen in der Creator-Liste */
+.notes-cell { max-width: 260px; min-width: 160px; cursor: text; }
+.notes-cell:hover .notes-preview, .notes-cell:hover .notes-add { color: var(--text); }
+.notes-preview { font-size: 13px; line-height: 1.45; color: var(--muted); white-space: pre-line; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.notes-preview-card { margin-top: 6px; }
+.notes-add { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--muted); opacity: .7; }
+.row-link:hover .notes-add { opacity: 1; }
