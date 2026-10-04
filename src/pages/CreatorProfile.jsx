@@ -15,6 +15,7 @@ import {
 } from '../lib/format.js';
 import {
   CREATOR_STATUSES, OUTREACH_STATUSES, CONTRACT_STATUSES, PLATFORMS, INVOICE_STATUSES, TASK_STATUSES, PAYOUT_STATUSES,
+  SIZE_TOP_GROUPS, SIZE_BOTTOM_GROUPS, SHOE_SIZES,
 } from '../../shared/constants.js';
 
 const TABS = [
@@ -257,6 +258,7 @@ function OverviewTab({ data, open, setTab }) {
 
   return (
     <div className="overview-grid">
+      <div className="stack-lg">
       <Card title="Auf einen Blick">
         <dl className="facts">
           <Fact label="Standort" value={[creator.city, creator.region, creator.country].filter(Boolean).join(', ')} />
@@ -275,6 +277,8 @@ function OverviewTab({ data, open, setTab }) {
           <Fact label="Angelegt" value={`${fmtDate(creator.created_at)}${creator.created_by_name ? ' von ' + creator.created_by_name : ''}`} />
         </dl>
       </Card>
+      <SizesCard creator={creator} />
+      </div>
 
       <div className="stack-lg">
         <Card title="Aktuelle Kooperationen" actions={<Button size="sm" icon="plus" onClick={() => open('collab')}>Neu</Button>} padded={false}>
@@ -332,6 +336,75 @@ const Fact = ({ label, value }) => (
     <dd>{value || <span className="muted">–</span>}</dd>
   </>
 );
+
+// ------------------------------------------------------------------
+const SIZE_FIELDS = ['size_top', 'size_bottom', 'size_shoes', 'height_cm', 'size_notes'];
+const sizeValues = (c) => Object.fromEntries(SIZE_FIELDS.map((k) => [k, c[k] === null || c[k] === undefined ? '' : String(c[k])]));
+
+function SizeSelect({ value, onChange, groups, options, label }) {
+  // eigene Eingaben (z. B. alte Werte) bleiben auswählbar
+  const all = groups ? groups.flatMap((g) => g.options) : options;
+  return (
+    <select className="input" value={value} onChange={onChange} aria-label={label}>
+      <option value="">– nicht angegeben –</option>
+      {value && !all.includes(value) && <option value={value}>{value}</option>}
+      {groups
+        ? groups.map((g) => (
+            <optgroup key={g.label} label={g.label}>
+              {g.options.map((o) => <option key={o} value={o}>{o}</option>)}
+            </optgroup>
+          ))
+        : options.map((o) => <option key={o} value={o}>{o}</option>)}
+    </select>
+  );
+}
+
+function SizesCard({ creator }) {
+  const { toast } = useUi();
+  const [vals, setVals] = useState(() => sizeValues(creator));
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { setVals(sizeValues(creator)); }, [creator.id, creator.updated_at]);
+  const initial = sizeValues(creator);
+  const dirty = SIZE_FIELDS.some((k) => vals[k] !== initial[k]);
+  const set = (k) => (e) => setVals((v) => ({ ...v, [k]: e.target.value }));
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.patch(`/creators/${creator.id}`, { ...vals, height_cm: vals.height_cm === '' ? null : vals.height_cm });
+      invalidateAll();
+      toast('Größen gespeichert.');
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <Card
+      title={<span className="with-icon"><Icon name="tag" size={16} /> Größen</span>}
+      subtitle="Für Produkte, Outfits & Shootings"
+      actions={dirty ? <Button variant="primary" size="sm" onClick={save} loading={saving}>Speichern</Button> : null}
+    >
+      <div className="sizes-grid">
+        <Field label="Oberteile">
+          <SizeSelect label="Oberteile" value={vals.size_top} onChange={set('size_top')} groups={SIZE_TOP_GROUPS} />
+        </Field>
+        <Field label="Hosen">
+          <SizeSelect label="Hosen" value={vals.size_bottom} onChange={set('size_bottom')} groups={SIZE_BOTTOM_GROUPS} />
+        </Field>
+        <Field label="Schuhe (EU)">
+          <SizeSelect label="Schuhe" value={vals.size_shoes} onChange={set('size_shoes')} options={SHOE_SIZES} />
+        </Field>
+        <Field label="Körpergröße (cm)">
+          <input className="input" type="number" inputMode="numeric" min="50" max="250" placeholder="z. B. 172" value={vals.height_cm} onChange={set('height_cm')} />
+        </Field>
+        <Field label="Hinweis" className="span-2">
+          <input className="input" maxLength={500} placeholder="z. B. trägt Sneaker eher eine Nummer größer" value={vals.size_notes} onChange={set('size_notes')} />
+        </Field>
+      </div>
+    </Card>
+  );
+}
 
 // ------------------------------------------------------------------
 function ContactTab({ creator }) {
