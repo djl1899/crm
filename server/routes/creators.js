@@ -34,6 +34,11 @@ export const creatorSchema = {
   contacted: v.bool({ label: 'Bereits angeschrieben' }),
   commission_rate: v.num({ label: 'Provision (%)', max: 100 }),
   bio: v.str({ label: 'Kurzvorstellung', max: 1500 }),
+  size_top: v.str({ label: 'Größe Oberteil', max: 20 }),
+  size_bottom: v.str({ label: 'Größe Hose', max: 20 }),
+  size_shoes: v.str({ label: 'Schuhgröße', max: 20 }),
+  height_cm: v.int({ label: 'Körpergröße', min: 50, max: 250 }),
+  size_notes: v.str({ label: 'Hinweis zu Größen', max: 500 }),
 };
 const CREATOR_COLUMNS = Object.keys(creatorSchema);
 
@@ -41,6 +46,7 @@ const FIELD_LABELS = {
   display_name: 'Name', first_name: 'Vorname', last_name: 'Nachname', email: 'E-Mail', phone: 'Telefon',
   city: 'Ort', region: 'Region', country: 'Land', language: 'Sprache', niche: 'Nische', interests: 'Interessen',
   notes: 'Notizen', commission_rate: 'Provision', bio: 'Kurzvorstellung',
+  size_top: 'Größe Oberteil', size_bottom: 'Größe Hose', size_shoes: 'Schuhgröße', height_cm: 'Körpergröße', size_notes: 'Hinweis zu Größen',
 };
 
 function normalizeUsername(raw) {
