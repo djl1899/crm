@@ -205,7 +205,7 @@ export default function register(route) {
     const { params, p, where, orderBy } = buildListQuery(query);
     const rows = await q(
       `select c.id, c.display_name, c.first_name, c.last_name, c.email, c.city, c.region, c.country, c.niche,
-        c.status, c.outreach_status, c.contacted, c.avatar_key, c.last_activity_at, c.created_at,
+        c.status, c.outreach_status, c.contacted, c.notes, c.avatar_key, c.last_activity_at, c.created_at,
         c.manager_id, u.name as manager_name,
         ig.username as instagram_username, ig.url as instagram_url, ig.followers as instagram_followers,
         tt.username as tiktok_username, tt.url as tiktok_url, tt.followers as tiktok_followers,
