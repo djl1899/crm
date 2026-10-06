@@ -18,7 +18,7 @@ const contractSchema = {
 
 const DOC_SELECT = `
   select d.id, d.creator_id, d.collaboration_id, d.category, d.filename, d.mime_type, d.size_bytes, d.created_at,
-    u.name as uploaded_by_name, c.display_name as creator_name, co.brand as collaboration_brand, co.campaign_name as collaboration_campaign
+    d.visible_to_creator, (u.role = 'creator') as uploaded_by_creator, u.name as uploaded_by_name, c.display_name as creator_name, co.brand as collaboration_brand, co.campaign_name as collaboration_campaign
   from documents d
   join creators c on c.id = d.creator_id
   left join users u on u.id = d.uploaded_by
@@ -110,6 +110,7 @@ export default function register(route) {
       creator_id: v.ref({ label: 'Creator', required: true }),
       collaboration_id: v.ref({ label: 'Kooperation' }),
       category: v.oneOf(DOCUMENT_CATEGORIES, { label: 'Kategorie', required: true }),
+      visible_to_creator: v.bool({ label: 'Für Creator sichtbar' }),
     });
     if (!(await one(`select id from creators where id = $1`, [meta.creator_id]))) throw new HttpError(422, 'Creator nicht gefunden.');
     if (meta.collaboration_id) {
@@ -121,9 +122,9 @@ export default function register(route) {
     let doc;
     try {
       doc = await one(
-        `insert into documents (creator_id, collaboration_id, category, filename, mime_type, size_bytes, blob_key, uploaded_by)
-         values ($1, $2, $3, $4, $5, $6, $7, $8) returning id`,
-        [meta.creator_id, meta.collaboration_id, meta.category, up.filename, up.mime, up.size, key, user.id]
+        `insert into documents (creator_id, collaboration_id, category, filename, mime_type, size_bytes, blob_key, uploaded_by, visible_to_creator)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id`,
+        [meta.creator_id, meta.collaboration_id, meta.category, up.filename, up.mime, up.size, key, user.id, meta.visible_to_creator]
       );
     } catch (e) {
       await removeFile(key);
@@ -145,6 +146,19 @@ export default function register(route) {
     const f = await getFile(d.blob_key);
     if (!f) throw new HttpError(404, 'Die Datei ist im Speicher nicht mehr vorhanden.');
     return fileResponse(f.data, { filename: d.filename, mime: d.mime_type, inline: query.get('download') !== '1' });
+  });
+
+  // Datei für den Creator-Bereich freigeben oder wieder verbergen
+  route('PATCH', '/documents/:id', async ({ req, params, user }) => {
+    const id = idParam(params.id);
+    const data = validate(await readJson(req), { visible_to_creator: v.bool({ label: 'Für Creator sichtbar' }) });
+    const d = await one(`update documents set visible_to_creator = $2 where id = $1 returning creator_id, filename`, [id, data.visible_to_creator]);
+    if (!d) throw new HttpError(404, 'Datei nicht gefunden.');
+    await logActivity({
+      creatorId: d.creator_id, userId: user.id, entityType: 'document', entityId: id, action: 'document_shared',
+      message: data.visible_to_creator ? `hat „${d.filename}“ im Creator-Bereich freigegeben.` : `hat „${d.filename}“ im Creator-Bereich verborgen.`,
+    });
+    return { ok: true, visible_to_creator: data.visible_to_creator };
   });
 
   route('DELETE', '/documents/:id', async ({ params, user }) => {

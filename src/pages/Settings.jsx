@@ -28,7 +28,7 @@ export function SettingsPage() {
   );
 }
 
-function ProfileCard() {
+export function ProfileCard() {
   const { user, setUser } = useAuth();
   const { toast } = useUi();
   const [v, setV] = useState({ name: user.name, email: user.email });
@@ -60,7 +60,7 @@ function ProfileCard() {
   );
 }
 
-function PasswordCard() {
+export function PasswordCard() {
   const { toast } = useUi();
   const [v, setV] = useState({ current_password: '', new_password: '', repeat: '' });
   const [errors, setErrors] = useState({});
@@ -203,7 +203,7 @@ function DemoCard() {
 // ---------------------------------------------------------------------------
 // Zwei-Faktor-Anmeldung
 // ---------------------------------------------------------------------------
-function TwoFactorCard() {
+export function TwoFactorCard() {
   const { toast } = useUi();
   const { user, setUser } = useAuth();
   const status = useApi('/auth/2fa/status');

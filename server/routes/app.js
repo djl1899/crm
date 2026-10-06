@@ -293,7 +293,7 @@ export default function register(route) {
       assignee_id: v.ref({ label: 'Verantwortlich' }),
     },
     prepare: async (data, { before }) => {
-      if (data.assignee_id && !(await one(`select id from users where id = $1`, [data.assignee_id]))) {
+      if (data.assignee_id && !(await one(`select id from users where id = $1 and role <> 'creator'`, [data.assignee_id]))) {
         throw new HttpError(422, 'Benutzer nicht gefunden.', { assignee_id: 'Ungültig.' });
       }
       if (data.status && data.status !== before?.status) data.done_at = data.status === 'Fertig' ? new Date().toISOString() : null;

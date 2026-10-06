@@ -52,11 +52,11 @@ export function LoginPage() {
       <div className="auth-page">
         <div className="auth-card">
           <div className="auth-brand">
-            <span className="brand-mark">C</span>
-            <span className="brand-name">Creator CRM</span>
+            <span className="brand-mark">{(auth.agencyName || 'L').slice(0, 1)}</span>
+            <span className="brand-name">{auth.agencyName || 'LLK Management'}</span>
           </div>
           <h1>Bestätigungscode</h1>
-          <p className="muted">Öffne deine Authenticator-App und gib den 6-stelligen Code für „Creator CRM“ ein.</p>
+          <p className="muted">Öffne deine Authenticator-App und gib den 6-stelligen Code ein.</p>
           <form onSubmit={submitCode} className="stack">
             <Field label="Code">
               <input
@@ -94,14 +94,14 @@ export function LoginPage() {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-brand">
-          <span className="brand-mark">C</span>
-          <span className="brand-name">Creator CRM</span>
+          <span className="brand-mark">{(auth.agencyName || 'L').slice(0, 1)}</span>
+          <span className="brand-name">{auth.agencyName || 'LLK Management'}</span>
         </div>
         <h1>{setup ? 'Ersteinrichtung' : 'Anmelden'}</h1>
         <p className="muted">
           {setup
             ? 'Lege das erste Konto an. Es erhält Administrator-Rechte und kann weitere Benutzer hinzufügen.'
-            : 'Melde dich mit deinem Konto an.'}
+            : 'Für das Team und für Creator mit eigenem Zugang.'}
         </p>
         <form onSubmit={submit} className="stack">
           {setup && (

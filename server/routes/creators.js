@@ -15,6 +15,31 @@ export const ACTIVE_COLLAB_SQL = sqlList(ACTIVE_COLLAB_STATUSES);
 export const REVENUE_COLLAB_SQL = sqlList(REVENUE_COLLAB_STATUSES);
 export const OPEN_TASK_SQL = sqlList(OPEN_TASK_STATUSES);
 
+/** Prüft eine IBAN (Länge + Prüfziffer nach ISO 13616) und gibt sie ohne Leerzeichen zurück. */
+export function ibanValidator(val) {
+  if (val === undefined || val === null || String(val).trim() === '') return null;
+  const s = String(val).replace(/\s+/g, '').toUpperCase();
+  if (!/^[A-Z]{2}\d{2}[A-Z0-9]{10,30}$/.test(s)) throw 'Die IBAN hat ein ungültiges Format.';
+  const rearranged = s.slice(4) + s.slice(0, 4);
+  const digits = rearranged.replace(/[A-Z]/g, (ch) => String(ch.charCodeAt(0) - 55));
+  let rem = 0;
+  for (const d of digits) rem = (rem * 10 + Number(d)) % 97;
+  if (rem !== 1) throw 'Die IBAN ist nicht gültig (Prüfziffer stimmt nicht).';
+  return s;
+}
+
+export const billingSchema = {
+  billing_name: v.str({ label: 'Rechnungsname', max: 160 }),
+  billing_street: v.str({ label: 'Straße und Hausnummer', max: 160 }),
+  billing_zip: v.str({ label: 'PLZ', max: 12 }),
+  billing_city: v.str({ label: 'Ort (Rechnung)', max: 80 }),
+  iban: ibanValidator,
+  bank_holder: v.str({ label: 'Kontoinhaber', max: 160 }),
+  tax_number: v.str({ label: 'Steuernummer', max: 40 }),
+  vat_id: v.str({ label: 'USt-IdNr.', max: 20 }),
+  small_business: v.bool({ label: 'Kleinunternehmer' }),
+};
+
 export const creatorSchema = {
   display_name: v.str({ label: 'Creator Name', required: true, max: 120 }),
   first_name: v.str({ label: 'Vorname', max: 80 }),
@@ -39,6 +64,7 @@ export const creatorSchema = {
   size_shoes: v.str({ label: 'Schuhgröße', max: 20 }),
   height_cm: v.int({ label: 'Körpergröße', min: 50, max: 250 }),
   size_notes: v.str({ label: 'Hinweis zu Größen', max: 500 }),
+  ...billingSchema,
 };
 const CREATOR_COLUMNS = Object.keys(creatorSchema);
 
@@ -47,6 +73,8 @@ const FIELD_LABELS = {
   city: 'Ort', region: 'Region', country: 'Land', language: 'Sprache', niche: 'Nische', interests: 'Interessen',
   notes: 'Notizen', commission_rate: 'Provision', bio: 'Kurzvorstellung',
   size_top: 'Größe Oberteil', size_bottom: 'Größe Hose', size_shoes: 'Schuhgröße', height_cm: 'Körpergröße', size_notes: 'Hinweis zu Größen',
+  billing_name: 'Rechnungsname', billing_street: 'Straße', billing_zip: 'PLZ', billing_city: 'Ort (Rechnung)', iban: 'IBAN',
+  bank_holder: 'Kontoinhaber', tax_number: 'Steuernummer', vat_id: 'USt-IdNr.', small_business: 'Kleinunternehmer',
 };
 
 function normalizeUsername(raw) {
@@ -114,7 +142,7 @@ async function saveTags(run, creatorId, tagIds) {
 
 async function assertManager(managerId) {
   if (!managerId) return;
-  const m = await one(`select id from users where id = $1`, [managerId]);
+  const m = await one(`select id from users where id = $1 and role <> 'creator'`, [managerId]);
   if (!m) throw new HttpError(422, 'Der ausgewählte Manager existiert nicht.', { manager_id: 'Ungültig.' });
 }
 
@@ -383,6 +411,8 @@ export default function register(route) {
     const c = await one(`select id, display_name, avatar_key from creators where id = $1`, [id]);
     if (!c) throw new HttpError(404, 'Creator nicht gefunden.');
     const docs = await q(`select blob_key from documents where creator_id = $1`, [id]);
+    // Zugang zum Creator-Bereich sperren, bevor der Creator verschwindet
+    await q(`update users set is_active = false, token_version = token_version + 1, invite_token_hash = null where creator_id = $1`, [id]);
     await q(`delete from creators where id = $1`, [id]);
     await Promise.all([...docs.map((d) => removeFile(d.blob_key)), c.avatar_key ? removeFile(c.avatar_key) : null]);
     await logActivity({ userId: user.id, entityType: 'creator', entityId: id, action: 'creator_deleted', message: `hat den Creator „${c.display_name}“ endgültig gelöscht.` });

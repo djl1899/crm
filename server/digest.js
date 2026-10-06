@@ -115,7 +115,7 @@ export async function sendDigestTo(user, { force = false } = {}) {
 
 /** Wird von der geplanten Netlify-Funktion jeden Morgen aufgerufen. */
 export async function sendAllDigests() {
-  const users = await q(`select id, name, email from users where digest_enabled = true and is_active = true`);
+  const users = await q(`select id, name, email from users where digest_enabled = true and is_active = true and role <> 'creator'`);
   const results = [];
   for (const u of users) {
     try {

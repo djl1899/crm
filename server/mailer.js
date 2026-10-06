@@ -8,10 +8,15 @@ export function mailConfig() {
   const host = process.env.SMTP_HOST;
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
-  const port = Number(process.env.SMTP_PORT || 465);
+  const parsedPort = parseInt(String(process.env.SMTP_PORT || '').trim(), 10);
+  const port = parsedPort > 0 && parsedPort < 65536 ? parsedPort : 465;
   const secure = (process.env.SMTP_SECURE || (port === 465 ? 'ssl' : 'starttls')).toLowerCase();
-  const from = process.env.SMTP_FROM || user;
-  return { host, user, pass, port, secure, from, configured: !!(host && user && pass) };
+  // SMTP_FROM darf „adresse@x.de“ oder „Name <adresse@x.de>“ sein
+  const rawFrom = (process.env.SMTP_FROM || user || '').trim();
+  const m = rawFrom.match(/^(.*?)\s*<([^>]+)>$/);
+  const from = (m ? m[2] : rawFrom).trim();
+  const fromName = m ? m[1].replace(/^"|"$/g, '').trim() : '';
+  return { host, user, pass, port, secure, from, fromName, configured: !!(host && user && pass) };
 }
 
 const b64 = (s) => Buffer.from(s, 'utf8').toString('base64');
@@ -132,7 +137,7 @@ export async function sendMail({ to, subject, text, html, fromName }) {
     await c.cmd(`MAIL FROM:<${cfg.from}>`, [250]);
     for (const rcpt of [].concat(to)) await c.cmd(`RCPT TO:<${rcpt}>`, [250, 251]);
     await c.cmd('DATA', [354]);
-    const msg = buildMessage({ from: cfg.from, fromName, to: [].concat(to).join(', '), subject, text, html });
+    const msg = buildMessage({ from: cfg.from, fromName: fromName || cfg.fromName, to: [].concat(to).join(', '), subject, text, html });
     await c.cmd(msg.replace(/\r\n\./g, '\r\n..') + '\r\n.', [250]);
     await c.cmd('QUIT').catch(() => {});
   } finally {

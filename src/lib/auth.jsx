@@ -11,7 +11,7 @@ export function AuthProvider({ children }) {
   const refresh = useCallback(async () => {
     try {
       const s = await api.get('/auth/status');
-      setState({ loading: false, user: s.user, needsSetup: s.needsSetup, error: null });
+      setState({ loading: false, user: s.user, needsSetup: s.needsSetup, agencyName: s.agency_name || 'LLK Management', error: null });
     } catch (e) {
       setState({ loading: false, user: null, needsSetup: false, error: e });
     }

@@ -38,6 +38,9 @@ function CreatorForm({ editId, profile }) {
     manager_id: editId ? (c.manager_id ? String(c.manager_id) : '') : String(user.id),
     status: c.status || 'Lead', outreach_status: c.outreach_status || 'Noch nicht kontaktiert', contacted: !!c.contacted,
     commission_rate: c.commission_rate ?? '', bio: c.bio || '',
+    billing_name: c.billing_name || '', billing_street: c.billing_street || '', billing_zip: c.billing_zip || '', billing_city: c.billing_city || '',
+    iban: c.iban || '', bank_holder: c.bank_holder || '', tax_number: c.tax_number || '', vat_id: c.vat_id || '',
+    small_business: c.small_business === true ? 'true' : c.small_business === false ? 'false' : '',
     tag_ids: (profile?.tags || []).map((t) => t.id),
     instagram: social('instagram'), tiktok: social('tiktok'),
   });
@@ -58,10 +61,12 @@ function CreatorForm({ editId, profile }) {
     setSaving(true);
     try {
       let id = editId;
+      const payload = { ...v };
+      if (payload.small_business === '') delete payload.small_business;
       if (editId) {
-        await api.patch(`/creators/${editId}`, v);
+        await api.patch(`/creators/${editId}`, payload);
       } else {
-        const res = await api.post('/creators', v);
+        const res = await api.post('/creators', payload);
         id = res.creator.id;
       }
       if (avatarFile) {
@@ -164,6 +169,37 @@ function CreatorForm({ editId, profile }) {
             </div>
           </Card>
 
+          <Card title="Rechnungs- & Bankdaten" subtitle="Kann der Creator auch selbst im Creator-Bereich pflegen">
+            <div className="form-grid">
+              <Field label="Rechnungsname" hint="Name oder Firma, wie auf Rechnungen" error={f.errors.billing_name} className="span-2">
+                <input className="input" value={v.billing_name} onChange={f.set('billing_name')} />
+              </Field>
+              <Field label="Straße und Hausnummer" error={f.errors.billing_street} className="span-2">
+                <input className="input" value={v.billing_street} onChange={f.set('billing_street')} />
+              </Field>
+              <Field label="PLZ" error={f.errors.billing_zip}>
+                <input className="input" value={v.billing_zip} onChange={f.set('billing_zip')} />
+              </Field>
+              <Field label="Ort" error={f.errors.billing_city}>
+                <input className="input" value={v.billing_city} onChange={f.set('billing_city')} />
+              </Field>
+              <Field label="IBAN" error={f.errors.iban}>
+                <input className="input mono" value={v.iban} onChange={f.set('iban')} placeholder="DE00 0000 0000 0000 0000 00" />
+              </Field>
+              <Field label="Kontoinhaber" error={f.errors.bank_holder}>
+                <input className="input" value={v.bank_holder} onChange={f.set('bank_holder')} />
+              </Field>
+              <Field label="Steuernummer" error={f.errors.tax_number}>
+                <input className="input" value={v.tax_number} onChange={f.set('tax_number')} />
+              </Field>
+              <Field label="USt-IdNr." error={f.errors.vat_id}>
+                <input className="input" value={v.vat_id} onChange={f.set('vat_id')} placeholder="DE…" />
+              </Field>
+              <Field label="Kleinunternehmer (§ 19 UStG)" error={f.errors.small_business}>
+                <Select value={v.small_business} onChange={f.set('small_business')} placeholder="– unbekannt –" options={[{ value: 'true', label: 'Ja' }, { value: 'false', label: 'Nein' }]} />
+              </Field>
+            </div>
+          </Card>
           <Card title="Social Media">
             {PLATFORMS.map((p) => (
               <fieldset key={p.key} className="social-fieldset">

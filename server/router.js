@@ -18,10 +18,13 @@ import appRoutes from './routes/app.js';
 import exportRoutes from './routes/export.js';
 import settingsRoutes from './routes/settings.js';
 import mediakitRoutes from './routes/mediakit.js';
+import portalRoutes from './routes/portal.js';
+import guideRoutes from './routes/guides.js';
 
 const routes = [];
 
-function route(method, pattern, handler, { auth = true } = {}) {
+// portal: true → auch für eingeloggte Creator erreichbar. Alles andere ist ausschließlich fürs Team.
+function route(method, pattern, handler, { auth = true, portal = false } = {}) {
   const keys = [];
   const regex = new RegExp(
     '^' +
@@ -31,12 +34,13 @@ function route(method, pattern, handler, { auth = true } = {}) {
       }) +
       '/?$'
   );
-  routes.push({ method, regex, keys, handler, auth });
+  routes.push({ method, regex, keys, handler, auth, portal });
 }
 
 for (const register of [
   authRoutes, userRoutes, creatorRoutes, outreachRoutes, collaborationRoutes, taskRoutes,
   contractRoutes, tagRoutes, dashboardRoutes, seedRoutes, expenseRoutes, mediaRoutes, appRoutes, exportRoutes, settingsRoutes, mediakitRoutes,
+  portalRoutes, guideRoutes,
 ]) {
   register(route);
 }
@@ -66,6 +70,8 @@ export async function handle(req) {
       await ensureSchema();
       const user = await getSessionUser(req);
       if (r.auth && !user) throw new HttpError(401, 'Bitte melde dich an.');
+      // Creator-Konten sehen nur ihren eigenen Bereich – alle Team-Endpunkte sind gesperrt
+      if (r.auth && user.role === 'creator' && !r.portal) throw new HttpError(403, 'Kein Zugriff.');
 
       const result = await r.handler({ req, params, query: url.searchParams, user });
       if (result instanceof Response) return result;

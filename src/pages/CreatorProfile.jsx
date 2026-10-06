@@ -410,8 +410,10 @@ function SizesCard({ creator }) {
 function ContactTab({ creator }) {
   const navigate = useNavigate();
   return (
+    <div className="overview-grid">
+    <div className="stack-lg">
     <Card title="Kontaktdaten" actions={<Button size="sm" icon="edit" onClick={() => navigate(`/creators/${creator.id}/edit`)}>Bearbeiten</Button>}>
-      <dl className="facts facts-2">
+      <dl className="facts">
         <Fact label="Vorname" value={creator.first_name} />
         <Fact label="Nachname" value={creator.last_name} />
         <Fact label="E-Mail" value={creator.email && <a className="link" href={`mailto:${creator.email}`}>{creator.email}</a>} />
@@ -421,6 +423,105 @@ function ContactTab({ creator }) {
         <Fact label="Land" value={creator.country} />
         <Fact label="Sprache" value={creator.language} />
       </dl>
+    </Card>
+    <Card title="Rechnungs- & Bankdaten" subtitle="Pflegt der Creator selbst im Creator-Bereich" actions={<Button size="sm" icon="edit" onClick={() => navigate(`/creators/${creator.id}/edit`)}>Bearbeiten</Button>}>
+      <dl className="facts">
+        <Fact label="Rechnungsname" value={creator.billing_name} />
+        <Fact label="Anschrift" value={[creator.billing_street, [creator.billing_zip, creator.billing_city].filter(Boolean).join(' ')].filter(Boolean).join(', ')} />
+        <Fact label="IBAN" value={creator.iban && <span className="mono">{creator.iban.replace(/(.{4})/g, '$1 ').trim()}</span>} />
+        <Fact label="Kontoinhaber" value={creator.bank_holder} />
+        <Fact label="Steuernummer" value={creator.tax_number} />
+        <Fact label="USt-IdNr." value={creator.vat_id} />
+        <Fact label="Kleinunternehmer" value={creator.small_business === null || creator.small_business === undefined ? null : creator.small_business ? 'Ja (§ 19 UStG)' : 'Nein'} />
+      </dl>
+    </Card>
+    </div>
+    <PortalAccessCard creator={creator} />
+    </div>
+  );
+}
+
+function PortalAccessCard({ creator }) {
+  const { toast, confirm } = useUi();
+  const { data, reload } = useApi(`/creators/${creator.id}/portal`);
+  const [email, setEmail] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [link, setLink] = useState(null);
+  const [error, setError] = useState(null);
+  const access = data?.access;
+  useEffect(() => setEmail(access?.email || creator.email || ''), [access?.email, creator.email]);
+
+  const invite = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await api.post(`/creators/${creator.id}/portal`, { email });
+      setLink(r.link);
+      toast(r.mailed ? 'Einladung per E-Mail verschickt.' : 'Einladungslink erstellt.');
+      reload();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const toggle = async () => {
+    if (access.is_active && !(await confirm({ title: 'Zugang sperren?', message: `${creator.display_name} kann sich danach nicht mehr im Creator-Bereich anmelden.`, confirmLabel: 'Sperren', danger: true }))) return;
+    try {
+      await api.patch(`/creators/${creator.id}/portal`, { is_active: !access.is_active });
+      toast(access.is_active ? 'Zugang gesperrt.' : 'Zugang freigeschaltet.');
+      reload();
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  };
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(link);
+      toast('Link kopiert.');
+    } catch {
+      toast('Bitte den Link markieren und kopieren.', 'error');
+    }
+  };
+
+  return (
+    <Card title="Creator-Bereich" subtitle="Eigener Login: Kooperationen, Auszahlungen, Dokumente, Leitfäden">
+      {!data ? <Spinner /> : (
+        <div className="stack">
+          {access ? (
+            <dl className="facts">
+              <Fact label="Status" value={!access.is_active ? <Badge tone="red">Gesperrt</Badge> : access.has_logged_in ? <Badge tone="green" dot>Aktiv</Badge> : access.invite_pending ? <Badge tone="amber" dot>Eingeladen</Badge> : <Badge tone="gray">Einladung abgelaufen</Badge>} />
+              <Fact label="Login-E-Mail" value={access.email} />
+              <Fact label="Letzte Anmeldung" value={access.last_login_at ? fmtRelative(access.last_login_at) : 'noch nie'} />
+              {access.invite_pending && <Fact label="Einladung gültig bis" value={fmtDateTime(access.invite_expires_at)} />}
+            </dl>
+          ) : (
+            <p className="muted small">Noch kein Zugang. Lege einen an – der Creator bekommt einen Link, um sein Passwort festzulegen.</p>
+          )}
+          {(!access || !access.has_logged_in || !access.is_active) && (
+            <Field label="E-Mail für den Login" error={error}>
+              <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@beispiel.de" />
+            </Field>
+          )}
+          {error && access?.has_logged_in && <div className="field-error">{error}</div>}
+          <div className="row-wrap">
+            <Button variant={access ? 'secondary' : 'primary'} icon="send" loading={busy} onClick={invite} disabled={!email}>
+              {!access ? 'Zugang anlegen & einladen' : access.has_logged_in ? 'Neuen Link (Passwort vergessen)' : 'Einladung erneut senden'}
+            </Button>
+            {access && <Button variant={access.is_active ? 'ghost' : 'secondary'} onClick={toggle}>{access.is_active ? 'Zugang sperren' : 'Wieder freischalten'}</Button>}
+          </div>
+          {link && (
+            <div className="invite-link">
+              <div className="small muted">{data.mail_configured ? 'Die Einladung wurde per E-Mail verschickt. Du kannst den Link auch direkt teilen (z. B. per WhatsApp):' : 'E-Mail-Versand ist nicht eingerichtet – schick diesen Link direkt an den Creator:'}</div>
+              <div className="invite-link-row">
+                <input className="input mono small" readOnly value={link} onFocus={(e) => e.target.select()} />
+                <Button size="sm" onClick={copy}>Kopieren</Button>
+              </div>
+              <div className="small muted">Gültig 7 Tage, nur einmal nutzbar.</div>
+            </div>
+          )}
+        </div>
+      )}
     </Card>
   );
 }
@@ -669,6 +770,15 @@ function ContractTab({ data, open }) {
       setSaving(false);
     }
   };
+  const toggleShare = async (d) => {
+    try {
+      await api.patch(`/documents/${d.id}`, { visible_to_creator: !d.visible_to_creator });
+      invalidateAll();
+      toast(d.visible_to_creator ? 'Im Creator-Bereich verborgen.' : 'Im Creator-Bereich freigegeben.');
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  };
   const removeDoc = async (d) => {
     if (!(await confirm({ title: 'Datei löschen?', message: `„${d.filename}“ wird dauerhaft gelöscht.`, confirmLabel: 'Löschen', danger: true }))) return;
     try {
@@ -722,13 +832,13 @@ function ContractTab({ data, open }) {
         }
         padded={false}
       >
-        <DocumentList items={docs.data?.items} loading={docs.loading && !docs.data} onDelete={removeDoc} />
+        <DocumentList items={docs.data?.items} loading={docs.loading && !docs.data} onDelete={removeDoc} onToggleShare={toggleShare} />
       </Card>
     </div>
   );
 }
 
-export function DocumentList({ items, loading, onDelete, showCreator = false }) {
+export function DocumentList({ items, loading, onDelete, onToggleShare, showCreator = false }) {
   if (loading) return <Spinner />;
   if (!items?.length) return <Empty icon="file" title="Noch keine Dateien" text="Verträge, Rechnungen, Briefings und Kampagnenunterlagen hier hochladen." />;
   return (
@@ -739,7 +849,9 @@ export function DocumentList({ items, loading, onDelete, showCreator = false }) 
           <div className="doc-main">
             <a href={`/api/documents/${d.id}/file`} target="_blank" rel="noopener noreferrer" className="strong doc-name">{d.filename}</a>
             <div className="cell-sub muted">
-              <Badge tone="gray">{d.category}</Badge> {fmtBytes(d.size_bytes)} · {fmtDate(d.created_at)} · {d.uploaded_by_name || '–'}
+              <Badge tone="gray">{d.category}</Badge>{' '}
+              {d.uploaded_by_creator ? <Badge tone="violet">Vom Creator</Badge> : d.visible_to_creator ? <Badge tone="blue">Für Creator sichtbar</Badge> : null}{' '}
+              {fmtBytes(d.size_bytes)} · {fmtDate(d.created_at)} · {d.uploaded_by_name || '–'}
               {showCreator && <> · <Link to={`/creators/${d.creator_id}?tab=contract`} className="link">{d.creator_name}</Link></>}
               {d.collaboration_brand && <> · {d.collaboration_brand}</>}
             </div>
@@ -747,6 +859,9 @@ export function DocumentList({ items, loading, onDelete, showCreator = false }) 
           <div className="doc-actions">
             <a className="icon-btn" href={`/api/documents/${d.id}/file`} target="_blank" rel="noopener noreferrer" title="Öffnen"><Icon name="eye" size={16} /></a>
             <a className="icon-btn" href={`/api/documents/${d.id}/file?download=1`} title="Herunterladen"><Icon name="download" size={16} /></a>
+            {onToggleShare && (
+              <IconButton icon={d.visible_to_creator ? 'eyeOff' : 'share'} label={d.visible_to_creator ? 'Im Creator-Bereich verbergen' : 'Für Creator freigeben'} onClick={() => onToggleShare(d)} />
+            )}
             {onDelete && <IconButton icon="trash" label="Löschen" onClick={() => onDelete(d)} />}
           </div>
         </li>

@@ -19,7 +19,7 @@ export default function register(route) {
     const users = await q(
       `select ${PUBLIC_USER_FIELDS},
         (select count(*)::int from creators c where c.manager_id = u.id and c.status <> 'Archiviert') as creator_count
-       from users u order by is_active desc, name asc`
+       from users u where u.role <> 'creator' order by is_active desc, name asc`
     );
     return { users };
   });
@@ -46,7 +46,7 @@ export default function register(route) {
     const body = await readJson(req);
     const data = validate(body, userSchema, { partial: true });
     const existing = await one(`select ${PUBLIC_USER_FIELDS} from users where id = $1`, [id]);
-    if (!existing) throw new HttpError(404, 'Benutzer nicht gefunden.');
+    if (!existing || existing.role === 'creator') throw new HttpError(404, 'Benutzer nicht gefunden.');
     if (id === user.id && (data.is_active === false || (data.role && data.role !== 'admin'))) {
       throw new HttpError(422, 'Du kannst dich nicht selbst deaktivieren oder deine Admin-Rolle entfernen.');
     }

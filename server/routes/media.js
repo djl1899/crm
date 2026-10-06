@@ -34,7 +34,7 @@ const SELECT = `
   left join creators c on c.id = m.creator_id`;
 
 async function checkRefs(d) {
-  if (d.assignee_id && !(await one(`select id from users where id = $1`, [d.assignee_id]))) throw new HttpError(422, 'Benutzer nicht gefunden.', { assignee_id: 'Ungültig.' });
+  if (d.assignee_id && !(await one(`select id from users where id = $1 and role <> 'creator'`, [d.assignee_id]))) throw new HttpError(422, 'Benutzer nicht gefunden.', { assignee_id: 'Ungültig.' });
   if (d.creator_id && !(await one(`select id from creators where id = $1`, [d.creator_id]))) throw new HttpError(422, 'Creator nicht gefunden.', { creator_id: 'Ungültig.' });
 }
 

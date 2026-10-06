@@ -100,7 +100,7 @@ export function clearSessionCookie(req) {
   return parts.join('; ');
 }
 
-export const PUBLIC_USER_FIELDS = 'id, name, email, role, is_active, created_at, last_login_at, totp_enabled, digest_enabled';
+export const PUBLIC_USER_FIELDS = 'id, name, email, role, is_active, created_at, last_login_at, totp_enabled, digest_enabled, creator_id';
 
 /** Liefert den eingeloggten, aktiven Benutzer oder null. */
 export async function getSessionUser(req) {

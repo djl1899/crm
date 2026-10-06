@@ -39,7 +39,7 @@ async function checkRefs(data, existing = {}) {
     if (!creatorId) data.creator_id = co.creator_id;
   }
   if ('assignee_id' in data && data.assignee_id) {
-    if (!(await one(`select id from users where id = $1`, [data.assignee_id]))) throw new HttpError(422, 'Benutzer nicht gefunden.', { assignee_id: 'Ungültig.' });
+    if (!(await one(`select id from users where id = $1 and role <> 'creator'`, [data.assignee_id]))) throw new HttpError(422, 'Benutzer nicht gefunden.', { assignee_id: 'Ungültig.' });
   }
 }
 

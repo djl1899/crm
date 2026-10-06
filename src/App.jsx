@@ -16,6 +16,9 @@ import { MediaPage } from './pages/Media.jsx';
 import { AppHubPage } from './pages/AppHub.jsx';
 import { UsersPage } from './pages/Users.jsx';
 import { SettingsPage } from './pages/Settings.jsx';
+import { GuidesPage, GuideViewPage } from './pages/Guides.jsx';
+import { InvitePage } from './pages/Invite.jsx';
+import { PortalApp } from './portal/Portal.jsx';
 
 const ROUTES = [
   ['/', DashboardPage],
@@ -32,6 +35,8 @@ const ROUTES = [
   ['/app', AppHubPage],
   ['/users', UsersPage],
   ['/settings', SettingsPage],
+  ['/leitfaeden', GuidesPage],
+  ['/leitfaeden/:slug', GuideViewPage],
 ];
 
 function Routes() {
@@ -45,6 +50,9 @@ function Routes() {
 
 function Gate() {
   const auth = useAuth();
+  const { pathname } = useLocation();
+  // Einladungslink für Creator funktioniert immer – auch wenn gerade jemand anderes eingeloggt ist
+  if (pathname === '/einladung') return <InvitePage />;
   if (auth.loading) return <div className="fullscreen-center"><Spinner label="Lade…" /></div>;
   if (auth.error) {
     return (
@@ -56,6 +64,7 @@ function Gate() {
     );
   }
   if (!auth.user) return <LoginPage />;
+  if (auth.user.role === 'creator') return <PortalApp agencyName={auth.agencyName} />;
   return (
     <LookupProvider>
       <Layout>

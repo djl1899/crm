@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, qs } from '../lib/api.js';
 import { useApi, useForm, invalidateAll, useDebounced } from '../lib/useApi.js';
 import { useLookups, useAuth } from '../lib/auth.jsx';
-import { toLocalInput, fmtBytes } from '../lib/format.js';
+import { toLocalInput, fmtBytes, fmtDateTime } from '../lib/format.js';
 import { renderTemplate } from '../lib/templates.js';
 import { Modal, Button, Field, Select, TagChip, useUi, handleFormError } from './ui.jsx';
 import { Icon } from './Icon.jsx';
@@ -414,7 +414,16 @@ export function CollaborationModal({ open, onClose, creator, collaboration, onSa
         <Field label="Beschreibung" error={f.errors.description} className="span-2">
           <textarea className="input" rows={3} value={v.description || ''} onChange={f.set('description')} />
         </Field>
-        <Field label="Notizen" error={f.errors.notes} className="span-2">
+        {collaboration?.content_submitted_at && (
+          <div className="span-2 submitted-box">
+            <div className="strong small">Vom Creator eingereicht · {fmtDateTime(collaboration.content_submitted_at)}</div>
+            {(collaboration.content_links || '').split('\n').filter(Boolean).map((l) => (
+              <a key={l} href={l} target="_blank" rel="noopener noreferrer" className="link small break">{l}</a>
+            ))}
+            {collaboration.content_note && <div className="small muted pre-wrap">{collaboration.content_note}</div>}
+          </div>
+        )}
+        <Field label="Interne Notizen" hint="Nur fürs Team – Creator sehen das nicht." error={f.errors.notes} className="span-2">
           <textarea className="input" rows={2} value={v.notes || ''} onChange={f.set('notes')} />
         </Field>
       </form>
@@ -527,6 +536,7 @@ export function UploadModal({ open, onClose, creator, defaultCategory = 'Sonstig
     f.setValues({
       creator_id: creator?.id || null, creator_label: creator?.display_name || '',
       category: defaultCategory, collaboration_id: collaborationId ? String(collaborationId) : '',
+      visible_to_creator: ['Rechnungen', 'Briefings', 'Kampagnenunterlagen'].includes(defaultCategory),
     });
   }, [open]); // eslint-disable-line
 
@@ -540,6 +550,7 @@ export function UploadModal({ open, onClose, creator, defaultCategory = 'Sonstig
     fd.append('creator_id', f.values.creator_id);
     fd.append('category', f.values.category);
     if (f.values.collaboration_id) fd.append('collaboration_id', f.values.collaboration_id);
+    fd.append('visible_to_creator', f.values.visible_to_creator ? 'true' : 'false');
     setSaving(true);
     try {
       await api.upload('/documents', fd);
@@ -588,6 +599,10 @@ export function UploadModal({ open, onClose, creator, defaultCategory = 'Sonstig
             )}
           </label>
         </Field>
+        <label className="checkbox span-2">
+          <input type="checkbox" checked={!!v.visible_to_creator} onChange={(e) => f.setValues((x) => ({ ...x, visible_to_creator: e.target.checked }))} />
+          <span>Im Creator-Bereich sichtbar <span className="muted">– der Creator kann die Datei ansehen und herunterladen</span></span>
+        </label>
       </form>
     </Modal>
   );

@@ -24,7 +24,7 @@ async function checkRefs(data) {
   if (data.amount !== undefined && data.amount !== null && data.amount <= 0) {
     throw new HttpError(422, 'Der Betrag muss größer als 0 sein.', { amount: 'Muss größer als 0 sein.' });
   }
-  if (data.paid_by && !(await one(`select id from users where id = $1`, [data.paid_by]))) {
+  if (data.paid_by && !(await one(`select id from users where id = $1 and role <> 'creator'`, [data.paid_by]))) {
     throw new HttpError(422, 'Benutzer nicht gefunden.', { paid_by: 'Ungültig.' });
   }
   if (data.creator_id && !(await one(`select id from creators where id = $1`, [data.creator_id]))) {

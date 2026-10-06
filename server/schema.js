@@ -370,6 +370,26 @@ const MIGRATIONS = [
     `alter table creators add column if not exists height_cm integer`,
     `alter table creators add column if not exists size_notes text`,
   ],
+  // 8: Creator-Bereich (Login für Creator), Rechnungsdaten, Dokument-Freigabe, Content-Einreichung
+  [
+    `alter table users add column if not exists creator_id integer references creators(id) on delete set null`,
+    `create unique index if not exists users_creator_uq on users (creator_id) where creator_id is not null`,
+    `alter table users add column if not exists invite_token_hash text`,
+    `alter table users add column if not exists invite_expires_at timestamptz`,
+    `alter table creators add column if not exists billing_name text`,
+    `alter table creators add column if not exists billing_street text`,
+    `alter table creators add column if not exists billing_zip text`,
+    `alter table creators add column if not exists billing_city text`,
+    `alter table creators add column if not exists iban text`,
+    `alter table creators add column if not exists bank_holder text`,
+    `alter table creators add column if not exists tax_number text`,
+    `alter table creators add column if not exists vat_id text`,
+    `alter table creators add column if not exists small_business boolean`,
+    `alter table documents add column if not exists visible_to_creator boolean not null default false`,
+    `alter table collaborations add column if not exists content_links text`,
+    `alter table collaborations add column if not exists content_note text`,
+    `alter table collaborations add column if not exists content_submitted_at timestamptz`,
+  ],
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

@@ -11,6 +11,7 @@ import {
 } from '../totp.js';
 import { logActivity } from '../activity.js';
 import { seedDemoData } from './seed.js';
+import { getSetting } from '../settings.js';
 
 const clientIp = (req) =>
   req.headers.get('x-nf-client-connection-ip') || (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || null;
@@ -30,7 +31,7 @@ async function finishLogin(req, user, email, extraCookies = []) {
 export default function register(route) {
   route('GET', '/auth/status', async ({ user }) => {
     const row = await one(`select count(*)::int as n from users`);
-    return { needsSetup: row.n === 0, user };
+    return { needsSetup: row.n === 0, user, agency_name: await getSetting('agency_name') };
   }, { auth: false });
 
   // Ersteinrichtung: erster Benutzer wird Administrator (nur möglich, solange keine Benutzer existieren)
@@ -126,7 +127,7 @@ export default function register(route) {
     return json({ ok: true }, 200, { 'Set-Cookie': clearSessionCookie(req) });
   }, { auth: false });
 
-  route('GET', '/auth/me', async ({ user }) => ({ user }));
+  route('GET', '/auth/me', async ({ user }) => ({ user }), { portal: true });
 
   // Eigenes Profil bearbeiten
   route('PATCH', '/auth/me', async ({ req, user }) => {
@@ -135,6 +136,7 @@ export default function register(route) {
       email: v.email({ required: true }),
       digest_enabled: v.bool({ label: 'Tägliche Mail' }),
     }, { partial: true });
+    if (user.role === 'creator') delete data.digest_enabled;
     if (data.email) {
       const dup = await one(`select id from users where lower(email) = $1 and id <> $2`, [data.email, user.id]);
       if (dup) throw new HttpError(409, 'Diese E-Mail-Adresse wird bereits verwendet.', { email: 'Bereits vergeben.' });
@@ -145,7 +147,7 @@ export default function register(route) {
       [user.id, data.name ?? null, data.email ?? null, data.digest_enabled ?? null]
     );
     return { user: updated };
-  });
+  }, { portal: true });
 
   // Eigenes Passwort ändern (alle anderen Sitzungen werden ungültig)
   route('POST', '/auth/password', async ({ req, user }) => {
@@ -163,7 +165,7 @@ export default function register(route) {
     );
     const cookie = await createSessionCookie(req, updated);
     return json({ ok: true }, 200, { 'Set-Cookie': cookie });
-  });
+  }, { portal: true });
 
   // ---------- Zwei-Faktor verwalten (eigenes Konto) ----------
   route('POST', '/auth/2fa/setup', async ({ user }) => {
@@ -172,7 +174,7 @@ export default function register(route) {
     await q(`update users set totp_pending = $2 where id = $1`, [user.id, secret]);
     const url = otpauthUrl({ secret, account: user.email });
     return { secret, otpauth_url: url, qr_svg: qrSvg(url) };
-  });
+  }, { portal: true });
 
   route('POST', '/auth/2fa/enable', async ({ req, user }) => {
     const body = await readJson(req);
@@ -188,7 +190,7 @@ export default function register(route) {
     );
     await logActivity({ userId: user.id, entityType: 'user', entityId: user.id, action: '2fa_enabled', message: 'hat die Zwei-Faktor-Anmeldung aktiviert.' });
     return { recovery_codes: codes };
-  });
+  }, { portal: true });
 
   route('POST', '/auth/2fa/disable', async ({ req, user }) => {
     const body = await readJson(req);
@@ -207,7 +209,7 @@ export default function register(route) {
     headers.append('Set-Cookie', await createSessionCookie(req, fresh));
     headers.append('Set-Cookie', clearTrustCookie(req));
     return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
-  });
+  }, { portal: true });
 
   route('POST', '/auth/2fa/recovery-codes', async ({ req, user }) => {
     const body = await readJson(req);
@@ -219,10 +221,10 @@ export default function register(route) {
     const codes = generateRecoveryCodes();
     await q(`update users set recovery_codes = $2::text[] where id = $1`, [user.id, codes.map(hashRecoveryCode)]);
     return { recovery_codes: codes };
-  });
+  }, { portal: true });
 
   route('GET', '/auth/2fa/status', async ({ user }) => {
     const row = await one(`select totp_enabled, totp_enabled_at, cardinality(recovery_codes)::int as recovery_left from users where id = $1`, [user.id]);
     return row;
-  });
+  }, { portal: true });
 }

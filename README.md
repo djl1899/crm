@@ -48,6 +48,13 @@ Demo-Daten wieder loswerden: In Neon unter *Branches* einfach die Datenbank zur�
 |---|---|
 | `DATABASE_URL` | **Pflicht.** PostgreSQL-Verbindung |
 | `SESSION_SECRET` | Optional, mind. 32 zufällige Zeichen. Ohne wird automatisch ein sicheres Secret erzeugt und in der Datenbank gespeichert. |
+| `SMTP_HOST` | Für die tägliche Mail, z. B. `smtp.ionos.de` |
+| `SMTP_PORT` | `465` (SSL, Standard) oder `587` (STARTTLS) |
+| `SMTP_USER` | Komplette E-Mail-Adresse des Absender-Postfachs |
+| `SMTP_PASS` | Passwort dieses Postfachs |
+| `SMTP_FROM` | Optional, abweichende Absenderadresse |
+
+Die tägliche Zusammenfassung wird von der geplanten Funktion `netlify/functions/daily-digest.mjs` um 05:00 UTC verschickt (07:00 Uhr Sommerzeit / 06:00 Uhr Winterzeit). Jeder Benutzer aktiviert sie selbst unter *Einstellungen*.
 
 ---
 
@@ -72,6 +79,31 @@ Demo-Daten wieder loswerden: In Neon unter *Branches* einfach die Datenbank zur�
 **Archivieren vs. Löschen:** Archivieren (Status „Archiviert“) blendet den Creator aus der aktiven Liste aus; er bleibt über den Filter *Archiv* auffindbar und kann wiederhergestellt werden. Endgültiges Löschen (nur Admins) entfernt den Creator samt Kooperationen, Aufgaben, Kontakten, Vertrag und Dateien – mit deutlicher Bestätigung.
 
 ---
+
+## Creator-Bereich (Login für Creator)
+
+Creator können sich mit einem eigenen Konto anmelden und sehen **nur ihre eigenen Daten** – das Team-CRM ist für sie komplett gesperrt (serverseitig, nicht nur ausgeblendet).
+
+- **Zugang anlegen:** Creator-Profil → Reiter „Kontaktdaten“ → Karte „Creator-Bereich“ → „Zugang anlegen & einladen“. Der Creator bekommt einen Link (per E-Mail, wenn SMTP eingerichtet ist, sonst zum Kopieren), legt sein Passwort fest und ist drin. Link: 7 Tage gültig, nur einmal nutzbar.
+- **Passwort vergessen:** Im selben Feld „Neuen Link“ erzeugen.
+- **Sperren:** „Zugang sperren“ meldet den Creator sofort ab.
+- **Was Creator sehen:** Übersicht mit Deadlines und To-dos (Aufgaben mit Status „Wartet auf Creator“), Kooperationen mit Briefing, Honorar, Provision und Auszahlung, Verdienst pro Monat/Jahr, freigegebene Dokumente, eigene Daten (Rechnungsadresse, IBAN, Steuerdaten, Größen) und die Creator-Leitfäden.
+- **Was Creator nie sehen:** interne Notizen, andere Creator, Outreach, Finanzen der Agentur, interne Leitfäden.
+- **Dokumente:** Beim Hochladen „Im Creator-Bereich sichtbar“ anhaken oder später über das Teilen-Symbol in der Dateiliste freigeben. Creator können selbst Rechnungen hochladen.
+- **Content einreichen:** Creator schicken Links zu ihrem Content; die Kooperation springt auf „Abnahme“ und der zuständige Manager bekommt automatisch eine Aufgabe.
+
+## Leitfäden
+
+Reiter „Leitfäden“ im Menü: 20 Leitfäden zu Gewerbe, Steuern, Kleinunternehmerregelung, Rechnungen, Werbekennzeichnung, Impressum, Musik- und Bildrechten, Verträgen, Künstlersozialabgabe, Rechtsform, Datenschutz u. a. – zum Lesen in der App und als PDF. Leitfäden mit „Intern“ sieht nur das Team, die übrigen auch Creator unter „Wissen“.
+
+Inhalte ändern: Texte stehen in `server/guides/*.js` (einfaches Markdown). Danach die PDFs neu erzeugen:
+
+```bash
+npm i -D playwright && npx playwright install chromium
+PLAYWRIGHT=playwright node scripts/build-guide-pdfs.mjs
+```
+
+Stand der Inhalte: Oktober 2026 – kein Ersatz für Steuer- oder Rechtsberatung.
 
 ## Sicherheit
 - Passwörter mit **scrypt** + Salt gehasht, nie im Klartext
