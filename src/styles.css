@@ -893,7 +893,7 @@ span.cal-chip { cursor: default; }
 }
 
 /* Listen */
-.lists-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 18px; align-items: start; }
+.lists-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 18px; align-items: start; }
 .lists-nav { padding: 6px; display: flex; flex-direction: column; gap: 2px; position: sticky; top: 76px; }
 .lists-nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: var(--radius-sm); color: var(--text-2); font-size: 14px; }
 .lists-nav-item:hover { background: var(--surface-2); }
@@ -916,3 +916,6 @@ span.cal-chip { cursor: default; }
 .portal-list-row.btn-reset { padding: 12px 18px; }
 .lists-toolbar > select { width: 190px; flex: none; }
 @media (max-width: 560px) { .lists-toolbar > select { width: 100%; } .period-picker select { min-width: 0; } }
+.list-notes { min-width: 220px; max-width: 360px; white-space: normal; }
+.lists-main td:first-child { min-width: 150px; } .list-notes { min-width: 200px; max-width: 320px; }
+.text-left { text-align: left; }

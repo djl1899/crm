@@ -103,12 +103,12 @@ function ListDetail({ id, onEdit, onDeleted }) {
         ) : (
           <div className="table-wrap">
             <table className="table">
-              <thead><tr><th>Firma</th><th>Ansprechpartner</th><th>Kontakt</th><th>Ort</th><th>Status</th><th>Zuletzt</th><th /></tr></thead>
+              <thead><tr><th>Firma</th><th>Ansprechpartner</th><th>Kontakt</th><th>Ort</th><th>Status</th><th>Notizen</th><th>Zuletzt</th></tr></thead>
               <tbody>
                 {contacts.map((c) => (
                   <tr key={c.id}>
                     <td>
-                      <div className="strong">{c.company || '–'}</div>
+                      <button className="link strong text-left" onClick={() => setContact(c)} title="Bearbeiten">{c.company || c.name || '–'}</button>
                       <div className="small muted">
                         {c.website && <a className="link" href={/^https?:/.test(c.website) ? c.website : `https://${c.website}`} target="_blank" rel="noopener noreferrer">Website</a>}
                         {c.website && c.instagram && ' · '}
@@ -127,8 +127,8 @@ function ListDetail({ id, onEdit, onDeleted }) {
                         {CONTACT_STATUSES.map((s) => <option key={s}>{s}</option>)}
                       </select>
                     </td>
+                    <td className="list-notes">{c.notes ? <div className="pre-wrap small">{c.notes}</div> : <button className="link small" onClick={() => setContact(c)}>+ Notiz</button>}</td>
                     <td className="nowrap muted small">{c.last_contacted_on ? fmtDate(c.last_contacted_on) : '–'}</td>
-                    <td><Button size="sm" variant="ghost" icon="edit" onClick={() => setContact(c)} aria-label="Bearbeiten" /></td>
                   </tr>
                 ))}
               </tbody>
