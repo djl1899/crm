@@ -8,7 +8,7 @@ import { Modal, Button, Field, Select, TagChip, useUi, handleFormError } from '.
 import { Icon } from './Icon.jsx';
 import {
   OUTREACH_CHANNELS, OUTREACH_STATUSES, OUTREACH_RESULT_SUGGESTIONS, COLLAB_STATUSES, INVOICE_STATUSES,
-  TASK_STATUSES, TASK_PRIORITIES, DOCUMENT_CATEGORIES, MAX_UPLOAD_BYTES, ALLOWED_UPLOAD_TYPES, PAYOUT_STATUSES,
+  TASK_STATUSES, TASK_PRIORITIES, DOCUMENT_CATEGORIES, CREATOR_VISIBLE_DEFAULT, MAX_UPLOAD_BYTES, ALLOWED_UPLOAD_TYPES, PAYOUT_STATUSES,
 } from '../../shared/constants.js';
 
 const fmtMoneyLocal = (n) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(Number.isFinite(n) ? n : 0);
@@ -310,6 +310,49 @@ export function OutreachModal({ open, onClose, creator, activity }) {
 }
 
 // ---------- Kooperation ----------
+const COLLAB_EXTRA_FIELDS = ['contact_name', 'contact_email', 'usage_rights', 'exclusivity', 'briefing_date', 'approval_date', 'publish_date', 'published_on', 'invoice_due_date', 'payout_date'];
+
+// Nachrichten mit dem Creator direkt am Deal
+export function CollabMessages({ id }) {
+  const { toast } = useUi();
+  const { data, reload } = useApi(`/collaborations/${id}/messages`);
+  const [body, setBody] = useState('');
+  const [sending, setSending] = useState(false);
+  const send = async () => {
+    if (!body.trim()) return;
+    setSending(true);
+    try {
+      await api.post(`/collaborations/${id}/messages`, { body });
+      setBody('');
+      reload();
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      setSending(false);
+    }
+  };
+  const items = data?.items || [];
+  return (
+    <div className="collab-messages">
+      <div className="form-section">Nachrichten mit dem Creator</div>
+      <div className="thread">
+        {!items.length && <p className="small muted">Noch keine Nachrichten. Der Creator sieht alles hier in seinem Bereich an diesem Deal.</p>}
+        {items.map((m) => (
+          <div key={m.id} className={`msg ${m.from_creator ? '' : 'mine'}`}>
+            <div className="msg-meta">{m.author || '–'}{m.from_creator ? ' (Creator)' : ''} · {fmtDateTime(m.created_at)}</div>
+            <div className="msg-body pre-wrap">{m.body}</div>
+          </div>
+        ))}
+      </div>
+      <div className="msg-form">
+        <textarea className="input" rows={2} value={body} onChange={(e) => setBody(e.target.value)} placeholder="Nachricht an den Creator…"
+          onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send(); }} />
+        <Button variant="primary" icon="send" onClick={send} loading={sending} disabled={!body.trim()}>Senden</Button>
+      </div>
+    </div>
+  );
+}
+
 export function CollaborationModal({ open, onClose, creator, collaboration, onSaved }) {
   const { toast } = useUi();
   const [saving, setSaving] = useState(false);
@@ -325,6 +368,7 @@ export function CollaborationModal({ open, onClose, creator, collaboration, onSa
       status: c.status || 'Anfrage', platform: c.platform || '', description: c.description || '', deliverables: c.deliverables || '',
       deadline: c.deadline || '', fee: c.fee ?? '', invoice_status: c.invoice_status || 'Nicht erstellt', notes: c.notes || '',
       commission_rate: c.commission_rate ?? '', payout_status: c.payout_status || 'Offen',
+      ...Object.fromEntries(COLLAB_EXTRA_FIELDS.map((k) => [k, c[k] ? String(c[k]).slice(0, k.endsWith('_date') || k === 'published_on' ? 10 : undefined) : ''])),
     });
   }, [open]); // eslint-disable-line
 
@@ -408,12 +452,32 @@ export function CollaborationModal({ open, onClose, creator, collaboration, onSa
         <Field label="Auszahlung an Creator" error={f.errors.payout_status}>
           <Select value={v.payout_status} onChange={f.set('payout_status')} options={PAYOUT_STATUSES} />
         </Field>
-        <Field label="Deliverables" error={f.errors.deliverables} className="span-2">
+        <Field label="Vereinbarte Inhalte (Deliverables)" error={f.errors.deliverables} className="span-2">
           <textarea className="input" rows={2} value={v.deliverables || ''} onChange={f.set('deliverables')} placeholder="z. B. 2 Reels, 3 Stories" />
         </Field>
-        <Field label="Beschreibung" error={f.errors.description} className="span-2">
+        <Field label="Kampagnenbeschreibung" error={f.errors.description} className="span-2" hint="Sieht der Creator im Creator-Bereich.">
           <textarea className="input" rows={3} value={v.description || ''} onChange={f.set('description')} />
         </Field>
+        <div className="form-section span-2">Ansprechpartner & Rechte</div>
+        <Field label="Ansprechpartner (Marke)" error={f.errors.contact_name}>
+          <input className="input" value={v.contact_name || ''} onChange={f.set('contact_name')} />
+        </Field>
+        <Field label="E-Mail Ansprechpartner" error={f.errors.contact_email}>
+          <input type="email" className="input" value={v.contact_email || ''} onChange={f.set('contact_email')} />
+        </Field>
+        <Field label="Nutzungsrechte" error={f.errors.usage_rights}>
+          <textarea className="input" rows={2} value={v.usage_rights || ''} onChange={f.set('usage_rights')} placeholder="z. B. 6 Monate organisch, keine Paid Ads" />
+        </Field>
+        <Field label="Exklusivität" error={f.errors.exclusivity}>
+          <textarea className="input" rows={2} value={v.exclusivity || ''} onChange={f.set('exclusivity')} placeholder="z. B. 4 Wochen keine Getränkemarke" />
+        </Field>
+        <div className="form-section span-2">Termine (erscheinen im Kalender des Creators)</div>
+        {[['briefing_date', 'Briefing-Termin'], ['approval_date', 'Freigabe bis'], ['publish_date', 'Veröffentlichung geplant'], ['published_on', 'Veröffentlicht am'],
+          ['invoice_due_date', 'Zahlung fällig am'], ['payout_date', 'An Creator ausgezahlt am']].map(([k, label]) => (
+          <Field key={k} label={label} error={f.errors[k]}>
+            <input type="date" className="input" value={v[k] || ''} onChange={f.set(k)} />
+          </Field>
+        ))}
         {collaboration?.content_submitted_at && (
           <div className="span-2 submitted-box">
             <div className="strong small">Vom Creator eingereicht · {fmtDateTime(collaboration.content_submitted_at)}</div>
@@ -427,6 +491,7 @@ export function CollaborationModal({ open, onClose, creator, collaboration, onSa
           <textarea className="input" rows={2} value={v.notes || ''} onChange={f.set('notes')} />
         </Field>
       </form>
+      {collaboration && <CollabMessages id={collaboration.id} />}
     </Modal>
   );
 }
@@ -536,7 +601,7 @@ export function UploadModal({ open, onClose, creator, defaultCategory = 'Sonstig
     f.setValues({
       creator_id: creator?.id || null, creator_label: creator?.display_name || '',
       category: defaultCategory, collaboration_id: collaborationId ? String(collaborationId) : '',
-      visible_to_creator: ['Rechnungen', 'Briefings', 'Kampagnenunterlagen'].includes(defaultCategory),
+      visible_to_creator: CREATOR_VISIBLE_DEFAULT.includes(defaultCategory),
     });
   }, [open]); // eslint-disable-line
 
@@ -583,7 +648,7 @@ export function UploadModal({ open, onClose, creator, defaultCategory = 'Sonstig
           </Field>
         )}
         <Field label="Kategorie" required error={f.errors.category}>
-          <Select value={v.category} onChange={f.set('category')} options={DOCUMENT_CATEGORIES} />
+          <Select value={v.category} onChange={(e) => f.setValues((x) => ({ ...x, category: e.target.value, visible_to_creator: CREATOR_VISIBLE_DEFAULT.includes(e.target.value) }))} options={DOCUMENT_CATEGORIES} />
         </Field>
         <Field label="Kooperation (optional)" error={f.errors.collaboration_id}>
           <CollaborationSelect creatorId={v.creator_id} value={v.collaboration_id} onChange={f.set('collaboration_id')} />

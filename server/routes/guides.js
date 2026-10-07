@@ -6,13 +6,13 @@ export default function register(route) {
   route('GET', '/guides', async ({ user }) => {
     const items = visibleGuides(user).map(({ body, ...meta }) => ({ ...meta, has_pdf: !!GUIDE_PDFS[meta.slug] }));
     return { items, categories: CATEGORY_ORDER.filter((c) => items.some((g) => g.category === c)) };
-  }, { portal: true });
+  });
 
   route('GET', '/guides/:slug', async ({ params, user }) => {
     const g = visibleGuides(user).find((x) => x.slug === params.slug);
     if (!g) throw new HttpError(404, 'Leitfaden nicht gefunden.');
     return { guide: { ...g, has_pdf: !!GUIDE_PDFS[g.slug] }, disclaimer: GUIDE_DISCLAIMER };
-  }, { portal: true });
+  });
 
   route('GET', '/guides/:slug/pdf', async ({ params, user }) => {
     const g = visibleGuides(user).find((x) => x.slug === params.slug);
@@ -27,5 +27,5 @@ export default function register(route) {
         'X-Content-Type-Options': 'nosniff',
       },
     });
-  }, { portal: true });
+  });
 }

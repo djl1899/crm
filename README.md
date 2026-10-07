@@ -87,14 +87,27 @@ Creator können sich mit einem eigenen Konto anmelden und sehen **nur ihre eigen
 - **Zugang anlegen:** Creator-Profil → Reiter „Kontaktdaten“ → Karte „Creator-Bereich“ → „Zugang anlegen & einladen“. Der Creator bekommt einen Link (per E-Mail, wenn SMTP eingerichtet ist, sonst zum Kopieren), legt sein Passwort fest und ist drin. Link: 7 Tage gültig, nur einmal nutzbar.
 - **Passwort vergessen:** Im selben Feld „Neuen Link“ erzeugen.
 - **Sperren:** „Zugang sperren“ meldet den Creator sofort ab.
-- **Was Creator sehen:** Übersicht mit Deadlines und To-dos (Aufgaben mit Status „Wartet auf Creator“), Kooperationen mit Briefing, Honorar, Provision und Auszahlung, Verdienst pro Monat/Jahr, freigegebene Dokumente, eigene Daten (Rechnungsadresse, IBAN, Steuerdaten, Größen) und die Creator-Leitfäden.
-- **Was Creator nie sehen:** interne Notizen, andere Creator, Outreach, Finanzen der Agentur, interne Leitfäden.
-- **Dokumente:** Beim Hochladen „Im Creator-Bereich sichtbar“ anhaken oder später über das Teilen-Symbol in der Dateiliste freigeben. Creator können selbst Rechnungen hochladen.
+- **Was Creator sehen:**
+  - **Übersicht:** nächste Termine, To-dos, aktive Deals, Einnahmen des Jahres, neueste Nachrichten.
+  - **Kalender:** Content-Abgabe, Veröffentlichung, Briefing- und Freigabetermine, Rechnungs- und Zahlungstermine (aus den Deals), allgemeine Steuerfristen und ein eigener Content-Plan.
+  - **Kooperationen:** Marke, Ansprechpartner, Kampagne, Plattform, Inhalte, Honorar, Nutzungsrechte, Exklusivität, Status Anfrage → Verhandlung → Bestätigt → Content fällig → Veröffentlicht → Rechnung → Bezahlt, dazu Vertrag/Briefing, Nachrichten und Content-Abgabe direkt am Deal.
+  - **Finanzen:** erwartet / fakturiert / bezahlt, LLK-Provision, USt getrennt, Ausgaben und Auslagenerstattungen, einstellbarer Steuerpuffer (nur Schätzung).
+  - **Rechnungen & Export:** Rechnungen und Belege, Export nach Monat oder Jahr als CSV, DATEV (EXTF) oder Steuerberater-Paket (ZIP mit CSV + Belegen).
+  - **Dokumente:** Managementvertrag, Vollmachten, Kampagnenverträge, Briefings, Freigaben, Rechnungen.
+  - **Meine Daten** und **Sicherheit**.
+- **Was Creator nie sehen:** interne Notizen, andere Creator, Outreach, Finanzen der Agentur, Listen und Leitfäden.
+- **Creator-Ansicht ansehen:** Im Creator-Profil oben „Creator-Ansicht ansehen“ – das Team sieht genau, was der Creator sieht (nur lesend).
+- **Dokumente:** Beim Hochladen „Im Creator-Bereich sichtbar“ anhaken oder später über das Teilen-Symbol in der Dateiliste freigeben. Creator können selbst Rechnungen, Belege und Freigaben hochladen.
 - **Content einreichen:** Creator schicken Links zu ihrem Content; die Kooperation springt auf „Abnahme“ und der zuständige Manager bekommt automatisch eine Aufgabe.
+- **DATEV-Export:** Standard ist SKR03 (Bank 1200, Erlöse 8400 bzw. 8195 bei Kleinunternehmern, Aufwand 4900). Konten sind im Export einstellbar – Format und Kontierung vorher mit dem Steuerberater abstimmen.
+
+## Listen
+
+Reiter „Listen“ im Menü: eigene Kontaktlisten (z. B. „Food-Marken Mannheim“, „Eventagenturen“) mit Firma, Ansprechpartner, Position, E-Mail, Telefon, Website, Instagram, Ort, Status und Notizen. Suche, Statusfilter, CSV-Export und CSV-Import (Spalten wie Firma; Ansprechpartner; E-Mail …).
 
 ## Leitfäden
 
-Reiter „Leitfäden“ im Menü: 20 Leitfäden zu Gewerbe, Steuern, Kleinunternehmerregelung, Rechnungen, Werbekennzeichnung, Impressum, Musik- und Bildrechten, Verträgen, Künstlersozialabgabe, Rechtsform, Datenschutz u. a. – zum Lesen in der App und als PDF. Leitfäden mit „Intern“ sieht nur das Team, die übrigen auch Creator unter „Wissen“.
+Reiter „Leitfäden“ im Menü: 20 Leitfäden zu Gewerbe, Steuern, Kleinunternehmerregelung, Rechnungen, Werbekennzeichnung, Impressum, Musik- und Bildrechten, Verträgen, Künstlersozialabgabe, Rechtsform, Datenschutz u. a. – zum Lesen in der App und als PDF. Leitfäden sind nur für das Team sichtbar – Creator sehen sie nicht.
 
 Inhalte ändern: Texte stehen in `server/guides/*.js` (einfaches Markdown). Danach die PDFs neu erzeugen:
 

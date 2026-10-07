@@ -261,11 +261,11 @@ Unter 16 Jahren ist für die Verarbeitung der Daten in vielen Fällen die **Einw
 4. **Rechnungsadresse** und **Bankverbindung** (pflegt der Creator selbst im Creator-Bereich)
 5. **Größen** und Körpergröße für Fashion-Anfragen
 6. **Zugang zum Creator-Bereich** im Creator-Profil anlegen und Einladungslink schicken
-7. Kurzes Gespräch zu **Werbekennzeichnung** und **Impressum** – die Leitfäden dazu sind im Creator-Bereich verlinkt
+7. Kurzes Gespräch zu **Werbekennzeichnung** und **Impressum** – nutzt dafür die Leitfäden als Gesprächsgrundlage (PDF bei Bedarf selbst weitergeben)
 8. **Media Kit** im CRM erzeugen und prüfen
 9. Ansprechpartner im Team festlegen (Feld „Verantwortlicher Manager“)
 
-> [!TIPP] Die Leitfäden zu Gewerbe, Steuern, Kleinunternehmerregelung, Werbekennzeichnung und Rechnungen sehen Creator auch in ihrem eigenen Bereich. Verweist im Gespräch einfach darauf.
+> [!TIPP] Die Leitfäden sind nur fürs Team sichtbar. Wenn ein Creator einen braucht, ladet das PDF herunter und schickt es gezielt weiter.
 `,
   },
 ];

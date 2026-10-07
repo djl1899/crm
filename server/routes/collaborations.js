@@ -21,6 +21,16 @@ const collabSchema = {
   commission_rate: v.num({ label: 'Provision (%)', max: 100 }),
   payout_status: v.oneOf(PAYOUT_STATUSES, { label: 'Auszahlung an Creator', def: 'Offen' }),
   notes: v.str({ label: 'Notizen', max: 10000 }),
+  contact_name: v.str({ label: 'Ansprechpartner', max: 120 }),
+  contact_email: v.email({ label: 'E-Mail Ansprechpartner' }),
+  usage_rights: v.str({ label: 'Nutzungsrechte', max: 3000 }),
+  exclusivity: v.str({ label: 'Exklusivität', max: 2000 }),
+  briefing_date: v.date({ label: 'Briefing-Termin' }),
+  approval_date: v.date({ label: 'Freigabe bis' }),
+  publish_date: v.date({ label: 'Veröffentlichung geplant' }),
+  published_on: v.date({ label: 'Veröffentlicht am' }),
+  invoice_due_date: v.date({ label: 'Rechnung fällig am' }),
+  payout_date: v.date({ label: 'Ausgezahlt am' }),
 };
 
 const MEDIA_EXCL_SQL = MEDIA_REVENUE_EXCLUDED.map((x) => `'${x}'`).join(',');

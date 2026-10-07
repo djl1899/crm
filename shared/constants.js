@@ -91,7 +91,38 @@ export const TASK_PRIORITIES = ['Niedrig', 'Normal', 'Hoch', 'Dringend'];
 
 export const CONTRACT_STATUSES = ['Kein Vertrag', 'In Vorbereitung', 'Zur Unterschrift', 'Aktiv', 'Ausgelaufen', 'Gekündigt'];
 
-export const DOCUMENT_CATEGORIES = ['Verträge', 'Rechnungen', 'Briefings', 'Kampagnenunterlagen', 'Sonstige Dokumente'];
+export const DOCUMENT_CATEGORIES = [
+  'Managementvertrag', 'Vollmachten', 'Kampagnenverträge', 'Verträge',
+  'Briefings', 'Freigaben', 'Kampagnenunterlagen',
+  'Rechnungen', 'Belege', 'Sonstige Dokumente',
+];
+// Gruppierung im Creator-Bereich
+export const PORTAL_DOC_GROUPS = [
+  { key: 'mgmt', label: 'Managementvertrag & Vollmachten', categories: ['Managementvertrag', 'Vollmachten'] },
+  { key: 'campaign', label: 'Kampagnenverträge', categories: ['Kampagnenverträge', 'Verträge'] },
+  { key: 'briefing', label: 'Briefings & Freigaben', categories: ['Briefings', 'Freigaben', 'Kampagnenunterlagen'] },
+  { key: 'invoices', label: 'Rechnungen & Belege', categories: ['Rechnungen', 'Belege'] },
+  { key: 'other', label: 'Sonstiges', categories: ['Sonstige Dokumente'] },
+];
+// Was Creator selbst hochladen dürfen
+export const PORTAL_UPLOAD_CATEGORIES = ['Rechnungen', 'Belege', 'Freigaben', 'Sonstige Dokumente'];
+// Für Creator standardmäßig sichtbar, wenn das Team hochlädt
+export const CREATOR_VISIBLE_DEFAULT = ['Managementvertrag', 'Vollmachten', 'Kampagnenverträge', 'Briefings', 'Freigaben', 'Rechnungen', 'Belege'];
+
+// Creator-Sicht auf den Deal-Status
+export const CREATOR_STAGES = ['Anfrage', 'Verhandlung', 'Bestätigt', 'Content fällig', 'Veröffentlicht', 'Rechnung', 'Bezahlt'];
+// Eigene Kalendereinträge der Creator
+export const CALENDAR_KINDS = ['Content-Plan', 'Termin', 'Erinnerung'];
+
+export const CREATOR_EXPENSE_CATEGORIES = [
+  'Technik & Equipment', 'Software & Abos', 'Requisiten & Deko', 'Reise & Fahrtkosten', 'Kleidung & Styling (nur Kostüm/Requisite)',
+  'Werbung & Marketing', 'Büro & Telefon', 'Steuerberatung & Gebühren', 'Sonstiges',
+];
+export const REIMBURSEMENT_STATUSES = ['Keine', 'Beantragt', 'Erstattet', 'Abgelehnt'];
+export const VAT_RATES = [19, 7, 0];
+
+// Team: Kontaktlisten
+export const CONTACT_STATUSES = ['Neu', 'Kontaktiert', 'Im Gespräch', 'Kunde', 'Kein Interesse'];
 
 // Plattformen: weitere Einträge hier ergänzen (z. B. YouTube) – DB-Tabelle social_accounts ist generisch.
 export const PLATFORMS = [

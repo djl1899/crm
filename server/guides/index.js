@@ -10,4 +10,5 @@ export const CATEGORY_ORDER = ['Start & Organisation', 'Steuern', 'Werbung & Rec
 
 export const GUIDES = [...steuern, ...recht, ...agentur].map((g) => ({ ...g, body: g.body.trim(), updated: GUIDES_UPDATED }));
 
-export const visibleGuides = (user) => GUIDES.filter((g) => user.role !== 'creator' || g.audience === 'all');
+// Leitfäden sind ausschließlich fürs Team – Creator sehen sie nie.
+export const visibleGuides = (user) => (user.role === 'creator' ? [] : GUIDES);

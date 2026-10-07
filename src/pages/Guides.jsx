@@ -45,7 +45,6 @@ export function GuidesPage({ base = '/leitfaeden', title = 'Leitfäden', subtitl
                   <div className="guide-card-text">{g.summary}</div>
                   <div className="guide-card-meta">
                     <span>{g.minutes} Min.</span>
-                    {g.audience === 'team' && <Badge tone="violet">Intern</Badge>}
                     {g.has_pdf && <span className="guide-card-pdf"><Icon name="download" size={13} /> PDF</span>}
                   </div>
                 </Link>
@@ -80,7 +79,6 @@ export function GuideViewPage({ params, base = '/leitfaeden', backLabel = 'Alle 
         <Badge tone="gray">{g.category}</Badge>
         <span>Stand {g.updated}</span>
         <span>ca. {g.minutes} Min. Lesezeit</span>
-        {g.audience === 'team' && <Badge tone="violet">Intern – nur fürs Team</Badge>}
       </div>
       <article className="guide-body">
         <Blocks blocks={blocks} />

@@ -4,7 +4,12 @@ const df = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', 
 const dtf = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 export const fmtNumber = (n) => (n === null || n === undefined || n === '' ? '–' : nf.format(Number(n)));
-export const fmtMoney = (n) => cf.format(Number(n || 0));
+const cf2 = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// Ganze Beträge ohne Cent („3.500 €“), sonst immer zwei Nachkommastellen („54,90 €“)
+export const fmtMoney = (n) => {
+  const x = Math.round(Number(n || 0) * 100) / 100;
+  return Number.isInteger(x) ? cf.format(x) : cf2.format(x);
+};
 export const fmtPercent = (n) => (n === null || n === undefined ? '–' : `${String(Number(n).toFixed(1)).replace('.', ',')} %`);
 
 export function fmtCompact(n) {

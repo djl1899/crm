@@ -390,6 +390,83 @@ const MIGRATIONS = [
     `alter table collaborations add column if not exists content_note text`,
     `alter table collaborations add column if not exists content_submitted_at timestamptz`,
   ],
+  // 9: Creator-Bereich 2.0 – Deal-Details, Nachrichten, Kalender, Ausgaben, Kontaktlisten
+  [
+    ...['contact_name text', 'contact_email text', 'usage_rights text', 'exclusivity text', 'briefing_date date', 'approval_date date',
+      'publish_date date', 'published_on date', 'invoice_due_date date', 'payout_date date']
+      .map((c) => `alter table collaborations add column if not exists ${c}`),
+    `alter table creators add column if not exists tax_buffer_rate numeric(5,2)`,
+    `create table if not exists collab_messages (
+      id serial primary key,
+      collaboration_id integer not null references collaborations(id) on delete cascade,
+      user_id integer references users(id) on delete set null,
+      body text not null,
+      created_at timestamptz not null default now()
+    )`,
+    `create index if not exists collab_messages_idx on collab_messages (collaboration_id, created_at)`,
+    `create table if not exists creator_calendar_entries (
+      id serial primary key,
+      creator_id integer not null references creators(id) on delete cascade,
+      collaboration_id integer references collaborations(id) on delete set null,
+      entry_date date not null,
+      entry_time text,
+      kind text not null default 'Content-Plan',
+      title text not null,
+      notes text,
+      platform text,
+      done boolean not null default false,
+      created_by integer references users(id) on delete set null,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )`,
+    `create index if not exists creator_calendar_idx on creator_calendar_entries (creator_id, entry_date)`,
+    `create table if not exists creator_expenses (
+      id serial primary key,
+      creator_id integer not null references creators(id) on delete cascade,
+      collaboration_id integer references collaborations(id) on delete set null,
+      expense_date date not null,
+      title text not null,
+      category text not null default 'Sonstiges',
+      amount_gross numeric(12,2) not null default 0,
+      vat_rate numeric(5,2) not null default 19,
+      reimbursable boolean not null default false,
+      reimbursement_status text not null default 'Keine',
+      document_id integer references documents(id) on delete set null,
+      notes text,
+      created_by integer references users(id) on delete set null,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )`,
+    `create index if not exists creator_expenses_idx on creator_expenses (creator_id, expense_date)`,
+    `create table if not exists contact_lists (
+      id serial primary key,
+      name text not null,
+      description text,
+      color text not null default 'blue',
+      created_by integer references users(id) on delete set null,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )`,
+    `create table if not exists list_contacts (
+      id serial primary key,
+      list_id integer not null references contact_lists(id) on delete cascade,
+      company text,
+      name text,
+      position text,
+      email text,
+      phone text,
+      website text,
+      instagram text,
+      city text,
+      status text not null default 'Neu',
+      notes text,
+      last_contacted_on date,
+      created_by integer references users(id) on delete set null,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )`,
+    `create index if not exists list_contacts_idx on list_contacts (list_id)`,
+  ],
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

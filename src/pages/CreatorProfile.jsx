@@ -15,7 +15,7 @@ import {
 } from '../lib/format.js';
 import {
   CREATOR_STATUSES, OUTREACH_STATUSES, CONTRACT_STATUSES, PLATFORMS, INVOICE_STATUSES, TASK_STATUSES, PAYOUT_STATUSES,
-  SIZE_TOP_GROUPS, SIZE_BOTTOM_GROUPS, SHOE_SIZES,
+  SIZE_TOP_GROUPS, SIZE_BOTTOM_GROUPS, SHOE_SIZES, DOCUMENT_CATEGORIES,
 } from '../../shared/constants.js';
 
 const TABS = [
@@ -186,6 +186,7 @@ function ProfileHeader({ data, onContact }) {
         </div>
         <div className="profile-actions">
           <Button variant="primary" icon="send" onClick={onContact}>Kontakt erfassen</Button>
+          <Button icon="eye" onClick={() => navigate(`/creators/${creator.id}/ansicht`)}>Creator-Ansicht ansehen</Button>
           <Button icon="edit" onClick={() => navigate(`/creators/${creator.id}/edit`)}>Bearbeiten</Button>
           <Menu
             trigger={<IconButton icon="more" label="Weitere Aktionen" className="icon-btn-bordered" />}
@@ -827,7 +828,7 @@ function ContractTab({ data, open }) {
         actions={
           <Menu
             trigger={<Button size="sm" variant="primary" icon="upload">Hochladen</Button>}
-            items={['Verträge', 'Rechnungen', 'Briefings', 'Kampagnenunterlagen', 'Sonstige Dokumente'].map((c) => ({ label: c, onClick: () => open('upload', c) }))}
+            items={DOCUMENT_CATEGORIES.map((c) => ({ label: c, onClick: () => open('upload', c) }))}
           />
         }
         padded={false}
@@ -931,6 +932,7 @@ function FinanceTab({ creator, stats, open }) {
           </div>
         )}
       </Card>
+      <CreatorExpensesCard creatorId={creator.id} />
     </div>
   );
 }
@@ -969,3 +971,48 @@ function NotesTab({ creator }) {
   );
 }
 
+
+// Ausgaben & Auslagen, die der Creator im Creator-Bereich erfasst hat
+const REIMB_TONE = { Keine: 'gray', Beantragt: 'amber', Erstattet: 'green', Abgelehnt: 'red' };
+function CreatorExpensesCard({ creatorId }) {
+  const { data } = useApi(`/creators/${creatorId}/expenses`);
+  const { toast } = useUi();
+  const items = data?.items || [];
+  const setStatus = async (e, reimbursement_status) => {
+    try {
+      await api.patch(`/creator-expenses/${e.id}`, { reimbursement_status });
+      invalidateAll();
+      toast('Erstattung aktualisiert.');
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  };
+  const open = items.filter((e) => e.reimbursement_status === 'Beantragt');
+  return (
+    <Card title="Ausgaben & Auslagen des Creators" subtitle={open.length ? `${open.length} Erstattung(en) beantragt` : 'Erfasst der Creator selbst im Creator-Bereich'} padded={false}>
+      {!items.length ? <Empty icon="wallet" title="Keine Ausgaben erfasst" /> : (
+        <div className="table-wrap">
+          <table className="table">
+            <thead><tr><th>Datum</th><th>Beschreibung</th><th>Kooperation</th><th className="num">Brutto</th><th>Beleg</th><th>Erstattung</th></tr></thead>
+            <tbody>
+              {items.map((e) => (
+                <tr key={e.id}>
+                  <td className="nowrap">{fmtDate(e.expense_date)}</td>
+                  <td><div className="strong">{e.title}</div><div className="cell-sub muted">{e.category} · {Number(e.vat_rate)} % USt</div></td>
+                  <td>{e.collaboration_brand || '–'}</td>
+                  <td className="num nowrap">{fmtMoney(e.amount_gross)}</td>
+                  <td>{e.document_id ? <a className="link small" href={`/api/documents/${e.document_id}/file`} target="_blank" rel="noopener noreferrer">{e.receipt_filename || 'Beleg'}</a> : <Badge tone="red">fehlt</Badge>}</td>
+                  <td>
+                    <select className={`status-select badge badge-${REIMB_TONE[e.reimbursement_status] || 'gray'}`} value={e.reimbursement_status} onChange={(ev) => setStatus(e, ev.target.value)} aria-label="Erstattung">
+                      {(data.statuses || []).map((st) => <option key={st}>{st}</option>)}
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
+  );
+}

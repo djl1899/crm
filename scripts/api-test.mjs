@@ -248,17 +248,17 @@ r = await call('GET', '/portal/overview');
 ok(r.status === 200 && r.data.creator.id === tom, 'Creator sieht eigene Übersicht');
 r = await call('PATCH', '/auth/me', { digest_enabled: true });
 ok(r.status === 200 && r.data.user.digest_enabled === false, 'Creator kann Team-Mail nicht aktivieren');
-r = await call('GET', '/guides');
-ok(r.status === 200 && r.data.items.length > 5 && r.data.items.every((g) => g.audience === 'all'), 'Creator sieht nur Creator-Leitfäden');
-r = await call('GET', '/guides/abrechnung-modelle');
-ok(r.status === 404, 'Interner Leitfaden für Creator gesperrt');
-res = await call('GET', '/guides/werbekennzeichnung/pdf', null, { raw: true });
-ok(res.status === 200 && res.headers.get('content-type') === 'application/pdf' && (await res.arrayBuffer()).byteLength > 1000, 'PDF-Download für Creator');
+for (const path of ['/guides', '/guides/werbekennzeichnung', '/guides/werbekennzeichnung/pdf', '/lists']) {
+  r = await call('GET', path);
+  ok(r.status === 403, `Creator gesperrt: GET ${path}`);
+}
 
 cookie = adminC;
 r = await call('GET', '/guides');
-ok(r.data.items.some((g) => g.audience === 'team'), 'Team sieht auch interne Leitfäden');
-r = await call('POST', '/collaborations', { creator_id: tom, brand: 'Portal Brand', fee: 1000, commission_rate: 20, status: 'Aktiv', start_date: today, deadline: today, notes: 'GEHEIM-INTERN' });
+ok(r.status === 200 && r.data.items.length >= 20, 'Team sieht alle Leitfäden');
+r = await call('POST', '/collaborations', { creator_id: tom, brand: 'Portal Brand', fee: 1000, commission_rate: 20, status: 'Aktiv', start_date: today, deadline: today, notes: 'GEHEIM-INTERN',
+  contact_name: 'Lisa Marke', contact_email: 'lisa@brand.de', usage_rights: '6 Monate organisch', exclusivity: '4 Wochen Kategorie Getränke', briefing_date: today, publish_date: today, invoice_due_date: today });
+ok(r.status === 200 || r.status === 201, 'Kooperation mit neuen Deal-Feldern angelegt');
 const pColl = r.data.id;
 r = await call('POST', '/collaborations', { creator_id: anna, brand: 'Fremd Brand', fee: 500, status: 'Aktiv', start_date: today });
 const foreignColl = r.data.id;
@@ -268,13 +268,15 @@ r = await call('POST', '/documents', fd, { form: true });
 const tomDoc = r.data.id;
 
 cookie = creatorC;
-r = await call('GET', '/portal/collaborations?filter=current');
+r = await call('GET', '/portal/collaborations?filter=active');
 const pc = r.data.items.find((x) => x.id === pColl);
-ok(pc && Number(pc.payout) === 800 && Number(pc.agency_fee) === 200, 'Creator sieht Honorar, Provision und Auszahlung');
+ok(pc && pc.money.net === 800 && pc.money.agency_fee === 200 && pc.money.vat === 152 && pc.stage === 'Content fällig', 'Creator sieht Honorar, Provision, USt und Stufe');
+ok(pc && pc.contact_name === 'Lisa Marke' && pc.usage_rights && pc.exclusivity, 'Ansprechpartner, Nutzungsrechte, Exklusivität sichtbar');
 ok(r.data.items.every((x) => x.id !== foreignColl), 'Fremde Kooperationen unsichtbar');
 ok(!JSON.stringify(r.data).includes('GEHEIM-INTERN'), 'Interne Notizen bleiben verborgen');
 r = await call('GET', '/portal/documents');
-ok(r.data.items.length === 0, 'Nicht freigegebene Datei unsichtbar');
+const docCount = (d) => d.groups.reduce((a, g) => a + g.items.length, 0);
+ok(docCount(r.data) === 0, 'Nicht freigegebene Datei unsichtbar');
 res = await call('GET', `/portal/documents/${tomDoc}/file`, null, { raw: true });
 ok(res.status === 404, 'Nicht freigegebene Datei nicht abrufbar');
 cookie = adminC;
@@ -282,7 +284,7 @@ r = await call('PATCH', `/documents/${tomDoc}`, { visible_to_creator: true });
 ok(r.status === 200, 'Team gibt Datei frei');
 cookie = creatorC;
 r = await call('GET', '/portal/documents');
-ok(r.data.items.length === 1, 'Freigegebene Datei sichtbar');
+ok(docCount(r.data) === 1 && r.data.groups.find((g) => g.key === 'briefing').items.length === 1, 'Freigegebene Datei sichtbar (Gruppe Briefings)');
 res = await call('GET', `/portal/documents/${tomDoc}/file`, null, { raw: true });
 ok(res.status === 200, 'Freigegebene Datei abrufbar');
 res = await call('GET', `/portal/documents/${docId}/file`, null, { raw: true });
@@ -305,14 +307,127 @@ r = await call('POST', `/portal/collaborations/${foreignColl}/content`, { conten
 ok(r.status === 404, 'Content für fremde Kooperation abgelehnt');
 r = await call('POST', `/portal/collaborations/${pColl}/content`, { content_links: 'https://drive.example.com/reel1\nhttps://drive.example.com/story', content_note: 'Bitte prüfen' });
 ok(r.status === 200 && r.data.item.status === 'Abnahme', 'Content eingereicht → Status „Abnahme“');
-r = await call('GET', `/portal/earnings?year=${today.slice(0, 4)}`);
-ok(r.status === 200 && Number(r.data.totals.open) === 800 && r.data.months.length === 12, 'Verdienst-Übersicht');
+const yr = today.slice(0, 4);
+r = await call('GET', `/portal/finance?year=${yr}`);
+ok(r.status === 200 && r.data.income.expected.net === 800 && r.data.agency_fee === 200 && r.data.months.length === 12, 'Finanzen: erwartet + Provision');
+
+// Nachrichten am Deal
+r = await call('POST', `/portal/collaborations/${pColl}/messages`, { body: 'Kann ich die Story einen Tag später posten?' });
+ok(r.status === 201, 'Creator schreibt Nachricht am Deal');
+r = await call('POST', `/portal/collaborations/${foreignColl}/messages`, { body: 'hack' });
+ok(r.status === 404, 'Nachricht an fremden Deal abgelehnt');
+r = await call('GET', `/portal/collaborations/${pColl}`);
+ok(r.status === 200 && r.data.messages.length === 1 && r.data.messages[0].mine === true && r.data.documents.length === 2, 'Deal-Detail mit Nachrichten und Dokumenten');
+r = await call('GET', `/portal/collaborations/${foreignColl}`);
+ok(r.status === 404, 'Fremdes Deal-Detail gesperrt');
+
+// Kalender
+r = await call('POST', '/portal/calendar', { entry_date: today, title: 'Reel drehen', kind: 'Content-Plan', platform: 'instagram', entry_time: '14:30' });
+ok(r.status === 201, 'Eigener Kalendereintrag');
+const entryId = r.data.id;
+r = await call('POST', '/portal/calendar', { entry_date: today, title: 'x', entry_time: '25 Uhr' });
+ok(r.status === 422, 'Ungültige Uhrzeit abgelehnt');
+r = await call('GET', `/portal/calendar?from=${today}&to=${today}`);
+const kinds = new Set(r.data.events.map((e) => e.kind));
+ok(['Briefing', 'Content-Abgabe', 'Veröffentlichung', 'Zahlung', 'Content-Plan'].every((k) => kinds.has(k)), 'Kalender: Deal-Termine + eigene Einträge');
+r = await call('PATCH', `/portal/calendar/${entryId}`, { done: true });
+ok(r.status === 200, 'Kalendereintrag abgehakt');
+
+// Ausgaben & Erstattung
+r = await call('POST', '/portal/expenses', { expense_date: today, title: 'Ringlicht', category: 'Technik & Equipment', amount_gross: 119, vat_rate: 19 });
+ok(r.status === 201, 'Ausgabe erfasst');
+const expId = r.data.id;
+r = await call('POST', '/portal/expenses', { expense_date: today, title: 'Bahnticket Shooting', category: 'Reise & Fahrtkosten', amount_gross: 50, vat_rate: 7, reimbursable: true, collaboration_id: pColl });
+ok(r.status === 201, 'Auslagenerstattung beantragt');
+const reimbId = r.data.id;
+r = await call('POST', '/portal/expenses', { expense_date: today, title: 'x', amount_gross: 10, vat_rate: 16 });
+ok(r.status === 422, 'Ungültiger Steuersatz abgelehnt');
+fd = new FormData();
+fd.append('file', pdf, 'Beleg Ringlicht.pdf');
+r = await call('POST', `/portal/expenses/${expId}/receipt`, fd, { form: true });
+ok(r.status === 201, 'Beleg zur Ausgabe hochgeladen');
+r = await call('PUT', '/portal/profile', { tax_buffer_rate: 25 });
+ok(r.status === 200, 'Steuerpuffer eingestellt');
+r = await call('GET', `/portal/finance?year=${yr}`);
+ok(r.data.expenses.net === 146.73 && r.data.expenses.reimbursable_open === 50 && r.data.buffer.rate === 25, 'Ausgaben netto, offene Erstattung, Pufferrate');
+
+// Exporte
+res = await call('GET', `/portal/export/income.csv?year=${yr}`, null, { raw: true });
+let tt = await res.text();
+ok(res.status === 200 && tt.includes('Portal Brand') && tt.includes('800,00'), 'Export Einnahmen CSV');
+res = await call('GET', `/portal/export/expenses.csv?year=${yr}&month=${Number(today.slice(5, 7))}`, null, { raw: true });
+tt = await res.text();
+ok(res.status === 200 && tt.includes('Ringlicht') && tt.includes('Beleg Ringlicht.pdf'), 'Export Ausgaben CSV (Monat)');
+res = await call('GET', `/portal/export/datev.csv?year=${yr}&expense=4930&berater=1234567&mandant=12345`, null, { raw: true });
+tt = Buffer.from(await res.arrayBuffer()).toString('latin1');
+ok(res.status === 200 && tt.startsWith('"EXTF";700;21;"Buchungsstapel"') && tt.includes(';4930;1200;9;') && tt.includes('1234567;12345'), 'DATEV-Export mit eigenen Konten');
+res = await call('GET', `/portal/export/package.zip?year=${yr}`, null, { raw: true });
+const zipBuf = Buffer.from(await res.arrayBuffer());
+ok(res.status === 200 && zipBuf.readUInt32LE(0) === 0x04034b50 && zipBuf.includes(Buffer.from('Uebersicht.txt')) && zipBuf.includes(Buffer.from('Belege/Belege/')), 'Steuerberater-Paket (ZIP mit Belegen)');
+res = await call('GET', `/portal/export/foo.csv`, null, { raw: true });
+ok(res.status === 404, 'Unbekannter Export → 404');
 r = await call('PUT', '/portal/profile', { iban: 'DE00 1234' });
 ok(r.status === 422 && r.data.details.iban, 'Ungültige IBAN abgelehnt');
 r = await call('PUT', '/portal/profile', { iban: 'DE89 3704 0044 0532 0130 00', billing_street: 'Musterweg 1', billing_zip: '10115', billing_city: 'Berlin', small_business: true, size_shoes: '42', notes: 'darf nicht', status: 'Archiviert' });
 ok(r.status === 200, 'Creator speichert eigene Daten');
 
 cookie = adminC;
+// Team: Creator-Ansicht (Vorschau, nur lesend)
+const asTom = { 'X-View-As-Creator': String(tom) };
+res = await fetch(BASE + '/portal/overview', { headers: { cookie, 'X-Requested-With': 'crm', ...asTom } });
+let j = await res.json();
+ok(res.status === 200 && j.preview === true && j.creator.id === tom, 'Team öffnet Creator-Ansicht');
+res = await fetch(BASE + `/portal/finance?year=${yr}&as=${tom}`, { headers: { cookie, 'X-Requested-With': 'crm' } });
+j = await res.json();
+ok(res.status === 200 && j.expenses.net === 146.73, 'Vorschau per ?as= liefert dieselben Finanzen');
+res = await fetch(BASE + '/portal/calendar', { method: 'POST', headers: { cookie, 'X-Requested-With': 'crm', 'Content-Type': 'application/json', ...asTom }, body: JSON.stringify({ entry_date: today, title: 'x' }) });
+ok(res.status === 403, 'Vorschau ist schreibgeschützt');
+r = await call('GET', '/portal/overview');
+ok(r.status === 400, 'Team ohne Creator-Angabe → 400');
+r = await call('GET', `/collaborations/${pColl}/messages`);
+ok(r.data.items.length === 1 && r.data.items[0].from_creator === true, 'Team sieht Creator-Nachricht');
+r = await call('POST', `/collaborations/${pColl}/messages`, { body: 'Ja, passt!' });
+ok(r.status === 201, 'Team antwortet am Deal');
+r = await call('GET', `/creators/${tom}/expenses`);
+ok(r.data.items[0].id === reimbId && r.data.items[0].reimbursement_status === 'Beantragt', 'Team sieht beantragte Erstattung zuerst');
+r = await call('PATCH', `/creator-expenses/${reimbId}`, { reimbursement_status: 'Erstattet' });
+ok(r.status === 200, 'Team markiert Erstattung');
+cookie = creatorC;
+r = await call('DELETE', `/portal/expenses/${reimbId}`);
+ok(r.status === 404, 'Erstattete Ausgabe nicht löschbar');
+r = await call('DELETE', `/portal/calendar/${entryId}`);
+ok(r.status === 200, 'Eigener Kalendereintrag gelöscht');
+cookie = adminC;
+
+console.log('Listen');
+r = await call('POST', '/lists', { name: 'Food-Marken Mannheim', color: 'green' });
+ok(r.status === 201 && r.data.list.contact_count === 0, 'Liste angelegt');
+const listId = r.data.list.id;
+r = await call('POST', '/lists', { name: '' });
+ok(r.status === 422, 'Listenname Pflicht');
+r = await call('POST', `/lists/${listId}/contacts`, { company: 'Matcha Bar', name: 'Jana Beispiel', position: 'Marketing', email: 'jana@matcha.example', city: 'Mannheim' });
+ok(r.status === 201, 'Kontakt angelegt');
+const contactId = r.data.contact.id;
+r = await call('POST', `/lists/${listId}/contacts`, { position: 'nur Position' });
+ok(r.status === 422, 'Firma oder Name nötig');
+r = await call('POST', `/lists/${listId}/contacts`, { company: 'X', email: 'kaputt' });
+ok(r.status === 422, 'Ungültige E-Mail abgelehnt');
+r = await call('PATCH', `/list-contacts/${contactId}`, { status: 'Kontaktiert', last_contacted_on: today });
+ok(r.status === 200 && r.data.contact.status === 'Kontaktiert', 'Kontaktstatus geändert');
+r = await call('POST', `/lists/${listId}/import`, { csv: 'Firma;Ansprechpartner;E-Mail;Ort\nAcai Haus;Ben;ben@acai.example;Heidelberg\n"Gelato; Co";;;Mannheim\nKaputt;X;nicht-mail;' });
+ok(r.status === 200 && r.data.imported === 2 && r.data.errors.length === 1, 'CSV-Import (2 ok, 1 Fehler)');
+r = await call('GET', `/lists/${listId}?q=heidelberg`);
+ok(r.data.contacts.length === 1 && r.data.contacts[0].company === 'Acai Haus', 'Suche in Liste');
+r = await call('GET', `/lists/${listId}?status=Kontaktiert`);
+ok(r.data.contacts.length === 1, 'Statusfilter');
+res = await call('GET', `/lists/${listId}/export.csv`, null, { raw: true });
+tt = await res.text();
+ok(res.status === 200 && tt.includes('"Gelato; Co"') && tt.includes('Matcha Bar'), 'CSV-Export der Liste');
+r = await call('GET', '/lists');
+ok(r.data.lists[0].contact_count === 3, 'Listenübersicht mit Anzahl');
+r = await call('DELETE', `/list-contacts/${contactId}`);
+ok(r.status === 200, 'Kontakt entfernt');
+
 r = await call('GET', `/creators/${tom}`);
 ok(r.data.creator.iban === 'DE89370400440532013000' && r.data.creator.small_business === true && r.data.creator.status !== 'Archiviert', 'Team sieht Bankdaten, Status unverändert');
 r = await call('GET', `/tasks?creator_id=${tom}`);

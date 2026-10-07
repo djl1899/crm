@@ -12,6 +12,7 @@ const NAV = [
   { to: '/collaborations', label: 'Kooperationen', icon: 'briefcase' },
   { to: '/tasks', label: 'Aufgaben', icon: 'tasks' },
   { to: '/outreach', label: 'Outreach', icon: 'send' },
+  { to: '/listen', label: 'Listen', icon: 'note' },
   { to: '/contracts', label: 'Verträge & Dokumente', icon: 'file' },
   { to: '/finance', label: 'Finanzen', icon: 'euro' },
   { to: '/leitfaeden', label: 'Leitfäden', icon: 'book' },

@@ -19,6 +19,7 @@ import { SettingsPage } from './pages/Settings.jsx';
 import { GuidesPage, GuideViewPage } from './pages/Guides.jsx';
 import { InvitePage } from './pages/Invite.jsx';
 import { PortalApp } from './portal/Portal.jsx';
+import { ListsPage } from './pages/Lists.jsx';
 
 const ROUTES = [
   ['/', DashboardPage],
@@ -35,6 +36,8 @@ const ROUTES = [
   ['/app', AppHubPage],
   ['/users', UsersPage],
   ['/settings', SettingsPage],
+  ['/listen', ListsPage],
+  ['/listen/:id', ListsPage],
   ['/leitfaeden', GuidesPage],
   ['/leitfaeden/:slug', GuideViewPage],
 ];
@@ -65,6 +68,9 @@ function Gate() {
   }
   if (!auth.user) return <LoginPage />;
   if (auth.user.role === 'creator') return <PortalApp agencyName={auth.agencyName} />;
+  // Team: Creator-Ansicht als Vorschau (nur lesend)
+  const preview = pathname.match(/^\/creators\/(\d+)\/ansicht(\/.*)?$/);
+  if (preview) return <PortalApp key={preview[1]} agencyName={auth.agencyName} previewId={Number(preview[1])} />;
   return (
     <LookupProvider>
       <Layout>
