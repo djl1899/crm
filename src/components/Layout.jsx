@@ -18,8 +18,6 @@ const NAV = [
   { to: '/leitfaeden', label: 'Leitfäden', icon: 'book' },
   { section: 'Media' },
   { to: '/media', label: 'Media Produktion', icon: 'camera' },
-  { section: 'Produkt' },
-  { to: '/app', label: 'App', icon: 'phoneApp' },
   { section: 'Verwaltung' },
   { to: '/users', label: 'Benutzer', icon: 'shield' },
   { to: '/settings', label: 'Einstellungen', icon: 'settings' },

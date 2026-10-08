@@ -238,7 +238,7 @@ const creatorC = cookie;
 r = await call('POST', '/auth/invite', { token: inviteToken, password: 'creator-pass-2' });
 ok(r.status === 410, 'Einladungslink nur einmal nutzbar');
 cookie = creatorC;
-for (const path of ['/creators', '/users', '/dashboard', '/collaborations', '/finance/summary', '/documents', '/tasks', `/creators/${tom}`, '/settings', '/app/overview', '/search?q=to']) {
+for (const path of ['/creators', '/users', '/dashboard', '/collaborations', '/finance/summary', '/documents', '/tasks', `/creators/${tom}`, '/settings', '/search?q=to']) {
   r = await call('GET', path);
   ok(r.status === 403, `Creator gesperrt: GET ${path}`);
 }

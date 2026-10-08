@@ -13,7 +13,6 @@ import { OutreachPage } from './pages/Outreach.jsx';
 import { ContractsPage } from './pages/Contracts.jsx';
 import { FinancePage } from './pages/Finance.jsx';
 import { MediaPage } from './pages/Media.jsx';
-import { AppHubPage } from './pages/AppHub.jsx';
 import { UsersPage } from './pages/Users.jsx';
 import { SettingsPage } from './pages/Settings.jsx';
 import { GuidesPage, GuideViewPage } from './pages/Guides.jsx';
@@ -33,7 +32,6 @@ const ROUTES = [
   ['/contracts', ContractsPage],
   ['/finance', FinancePage],
   ['/media', MediaPage],
-  ['/app', AppHubPage],
   ['/users', UsersPage],
   ['/settings', SettingsPage],
   ['/listen', ListsPage],
