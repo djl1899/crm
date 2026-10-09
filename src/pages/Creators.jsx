@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useApi, useDebounced, invalidateAll } from '../lib/useApi.js';
 import { useSearchParams, useNavigate, Link } from '../lib/router.jsx';
 import { useLookups } from '../lib/auth.jsx';
 import { qs } from '../lib/api.js';
-import { PageHeader, Button, Select, Avatar, StatusBadge, TagChip, Pagination, Spinner, ErrorBox, Empty, Badge, Modal, useUi } from '../components/ui.jsx';
+import { PageHeader, Button, Select, Avatar, StatusBadge, TagChip, Spinner, ErrorBox, Empty, Badge, Modal, useUi } from '../components/ui.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { ImportModal } from '../components/ImportModal.jsx';
 import { fmtCompact, fmtNumber, fmtRelative, fmtDateTime } from '../lib/format.js';
+const STEP = 50;
 import { CREATOR_STATUSES, OUTREACH_STATUSES, CONTRACT_STATUSES } from '../../shared/constants.js';
 
 const FILTER_KEYS = [
@@ -42,8 +43,23 @@ export function CreatorsPage() {
   }, [debounced]); // eslint-disable-line
 
   const query = {};
-  for (const k of [...FILTER_KEYS, 'sort', 'dir', 'page']) if (params.get(k)) query[k] = params.get(k);
-  const { data, error, loading, reload } = useApi('/creators' + qs({ ...query, page_size: 25 }));
+  for (const k of [...FILTER_KEYS, 'sort', 'dir']) if (params.get(k)) query[k] = params.get(k);
+  // Endlos-Scrollen: statt Seiten werden beim Runterscrollen automatisch weitere Creator nachgeladen
+  const queryKey = qs(query);
+  const [limit, setLimit] = useState(STEP);
+  useEffect(() => setLimit(STEP), [queryKey]);
+  const { data, error, loading, reload } = useApi('/creators' + qs({ ...query, page_size: limit }));
+  const hasMore = !!data && data.items.length < data.total;
+  const sentinel = useRef(null);
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || !hasMore || loading) return;
+    const io = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) setLimit((l) => l + STEP);
+    }, { rootMargin: '400px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore, loading, data]);
 
   const setFilter = (k) => (e) => setParams({ [k]: e && e.target ? e.target.value : e, page: null });
   const activeCount = FILTER_KEYS.filter((k) => k !== 'q' && params.get(k)).length;
@@ -254,7 +270,9 @@ export function CreatorsPage() {
               </li>
             ))}
           </ul>
-          <Pagination page={data.page} pages={data.pages} total={data.total} label="Creator" onPage={(p) => setParams({ page: p > 1 ? p : null })} />
+          <div ref={sentinel} className="scroll-footer">
+            {hasMore ? <Spinner label="Lade weitere Creator…" /> : <span className="muted small">{data.total} {data.total === 1 ? 'Creator' : 'Creator'} · alle geladen</span>}
+          </div>
         </div>
       ) : null}
       <ImportModal open={importOpen} onClose={() => setImportOpen(false)} />

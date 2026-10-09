@@ -919,3 +919,4 @@ span.cal-chip { cursor: default; }
 .list-notes { min-width: 220px; max-width: 360px; white-space: normal; }
 .lists-main td:first-child { min-width: 150px; } .list-notes { min-width: 200px; max-width: 320px; }
 .text-left { text-align: left; }
+.scroll-footer { display: flex; justify-content: center; padding: 18px; border-top: 1px solid var(--border); min-height: 60px; align-items: center; }

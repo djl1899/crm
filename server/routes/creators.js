@@ -234,7 +234,7 @@ function buildListQuery(qs) {
 
 export default function register(route) {
   route('GET', '/creators', async ({ query }) => {
-    const pageSize = intParam(query.get('page_size'), { min: 1, max: 100, def: 25 });
+    const pageSize = intParam(query.get('page_size'), { min: 1, max: 5000, def: 25 });
     const page = intParam(query.get('page'), { min: 1, def: 1 });
     const { params, p, where, orderBy } = buildListQuery(query);
     const rows = await q(
