@@ -93,7 +93,7 @@ export async function buildDigestMail(user, data) {
   const html = `<!doctype html><html><body style="margin:0;background:#f5f6f8;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif">
 <div style="max-width:600px;margin:0 auto;padding:24px 16px">
 <div style="background:#fff;border:1px solid #e6e8ec;border-radius:12px;padding:24px 26px">
-<div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#6b7280;font-weight:600">${esc(settings.agency_name || 'Creator CRM')} · Tagesübersicht</div>
+<div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#6b7280;font-weight:600">${esc(settings.agency_name || 'LLK Management')} · Tagesübersicht</div>
 <h2 style="margin:6px 0 4px;font-size:20px;color:#111827">Guten Morgen ${esc(user.name.split(' ')[0])}</h2>
 <div style="color:#6b7280">${esc(today)}</div>
 ${sections.join('\n')}
@@ -109,7 +109,7 @@ export async function sendDigestTo(user, { force = false } = {}) {
   const data = await collectDigest(user.id);
   if (data.empty && !force) return { user: user.email, sent: false, reason: 'nichts fällig' };
   const mail = await buildDigestMail(user, data);
-  await sendMail({ to: user.email, subject: mail.subject, text: mail.text, html: mail.html, fromName: 'Creator CRM' });
+  await sendMail({ to: user.email, subject: mail.subject, text: mail.text, html: mail.html, fromName: 'LLK Management CRM' });
   return { user: user.email, sent: true };
 }
 

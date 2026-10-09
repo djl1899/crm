@@ -66,7 +66,7 @@ export function verifyTotp(secret, code, lastUsedStep = null) {
   return null;
 }
 
-export function otpauthUrl({ secret, account, issuer = 'Creator CRM' }) {
+export function otpauthUrl({ secret, account, issuer = 'LLK Management CRM' }) {
   const label = encodeURIComponent(`${issuer}:${account}`);
   return `otpauth://totp/${label}?secret=${secret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
 }

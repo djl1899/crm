@@ -52,8 +52,7 @@ export function LoginPage() {
       <div className="auth-page">
         <div className="auth-card">
           <div className="auth-brand">
-            <span className="brand-mark">{(auth.agencyName || 'L').slice(0, 1)}</span>
-            <span className="brand-name">{auth.agencyName || 'LLK Management'}</span>
+            <img src="/llk-logo.png" alt={auth.agencyName || 'LLK Management'} className="brand-logo brand-logo-lg" />
           </div>
           <h1>Bestätigungscode</h1>
           <p className="muted">Öffne deine Authenticator-App und gib den 6-stelligen Code ein.</p>
@@ -94,8 +93,7 @@ export function LoginPage() {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-brand">
-          <span className="brand-mark">{(auth.agencyName || 'L').slice(0, 1)}</span>
-          <span className="brand-name">{auth.agencyName || 'LLK Management'}</span>
+          <img src="/llk-logo.png" alt={auth.agencyName || 'LLK Management'} className="brand-logo brand-logo-lg" />
         </div>
         <h1>{setup ? 'Ersteinrichtung' : 'Anmelden'}</h1>
         <p className="muted">

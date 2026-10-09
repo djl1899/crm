@@ -260,7 +260,7 @@ export function TwoFactorCard() {
     });
   };
   const downloadCodes = () => {
-    const text = `Creator CRM – Wiederherstellungscodes für ${user.email}\nJeder Code funktioniert genau einmal.\n\n${codes.join('\n')}\n`;
+    const text = `LLK Management CRM – Wiederherstellungscodes für ${user.email}\nJeder Code funktioniert genau einmal.\n\n${codes.join('\n')}\n`;
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
     a.download = 'creator-crm-wiederherstellungscodes.txt';

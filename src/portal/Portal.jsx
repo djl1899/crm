@@ -98,8 +98,7 @@ export function PortalApp({ agencyName = 'LLK Management', previewId = null }) {
         )}
         <aside className={`sidebar ${mobileOpen ? 'open' : ''}`}>
           <div className="brand">
-            <span className="brand-mark">{agencyName.slice(0, 1)}</span>
-            <span className="brand-name">{agencyName}<span className="brand-sub">Creator-Bereich</span></span>
+            <span className="brand-stack"><img src="/llk-logo.png" alt={agencyName} className="brand-logo" /><span className="brand-sub">Creator-Bereich</span></span>
             <button className="icon-btn sidebar-close" onClick={() => setMobileOpen(false)} aria-label="Menü schließen"><Icon name="x" /></button>
           </div>
           <nav className="nav">
@@ -124,7 +123,7 @@ export function PortalApp({ agencyName = 'LLK Management', previewId = null }) {
         <div className="main">
           <header className="topbar portal-topbar">
             <button className="icon-btn menu-toggle" onClick={() => setMobileOpen(true)} aria-label="Menü öffnen"><Icon name="menu" /></button>
-            <div className="portal-topbar-title">{agencyName}</div>
+            <div className="portal-topbar-title"><img src="/llk-logo.png" alt={agencyName} className="brand-logo brand-logo-sm" /></div>
             <div className="topbar-actions">
               {!previewId && <button className="icon-btn" onClick={logout} title="Abmelden" aria-label="Abmelden"><Icon name="logout" size={17} /></button>}
             </div>

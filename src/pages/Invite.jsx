@@ -38,8 +38,7 @@ export function InvitePage() {
 
   const brand = (
     <div className="auth-brand">
-      <span className="brand-mark">{(auth.agencyName || 'L').slice(0, 1)}</span>
-      <span className="brand-name">{auth.agencyName || 'LLK Management'}</span>
+      <img src="/llk-logo.png" alt={auth.agencyName || 'LLK Management'} className="brand-logo brand-logo-lg" />
     </div>
   );
 

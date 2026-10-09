@@ -37,8 +37,7 @@ export function Layout({ children }) {
     <div className="app">
       <aside className={`sidebar ${mobileOpen ? 'open' : ''}`}>
         <div className="brand">
-          <span className="brand-mark">C</span>
-          <span className="brand-name">Creator CRM</span>
+          <img src="/llk-logo.png" alt="LLK Management" className="brand-logo" />
           <button className="icon-btn sidebar-close" onClick={() => setMobileOpen(false)} aria-label="Menü schließen">
             <Icon name="x" />
           </button>
