@@ -52,6 +52,30 @@ export function UserSelect({ value, onChange, placeholder = '– niemand –', i
   );
 }
 
+/** Farbe je Teammitglied (gleiche Reihenfolge wie im Kalender) */
+export function usePersonColors() {
+  const { users } = useLookups();
+  const byId = [...users].sort((a, b) => a.id - b.id);
+  return (id) => PERSON_COLORS[Math.max(0, byId.findIndex((u) => u.id === id)) % PERSON_COLORS.length];
+}
+
+/** Kleine überlappende Avatare der Verantwortlichen */
+export function AvatarStack({ ids = [], max = 3 }) {
+  const { users } = useLookups();
+  const colorOf = usePersonColors();
+  const list = (ids || []).map((id) => users.find((u) => u.id === id)).filter(Boolean);
+  if (!list.length) return <span className="avatar-stack empty" title="Niemand zugewiesen">–</span>;
+  const shown = list.slice(0, max);
+  return (
+    <span className="avatar-stack" title={list.map((u) => u.name).join(', ')}>
+      {shown.map((u) => (
+        <span key={u.id} className="avatar-stack-item" style={{ background: colorOf(u.id) }}>{u.name.split(/\s+/).map((x) => x[0]).slice(0, 2).join('')}</span>
+      ))}
+      {list.length > max && <span className="avatar-stack-item more">+{list.length - max}</span>}
+    </span>
+  );
+}
+
 /** Mehrere Teammitglieder auswählen (Chips zum An-/Abwählen). value: Array von IDs, Reihenfolge = Auswahlreihenfolge. */
 export function UserMultiSelect({ value = [], onChange, includeInactive = false, size = 'md', emptyLabel = 'niemand' }) {
   const { users } = useLookups();

@@ -8,10 +8,10 @@ import {
   useUi, handleFormError,
 } from '../components/ui.jsx';
 import { Icon } from '../components/Icon.jsx';
-import { OutreachModal, CollaborationModal, TaskModal, UploadModal, UserSelect, UserMultiSelect, TagPicker, TaskStatusSelect } from '../components/forms.jsx';
+import { OutreachModal, CollaborationModal, TaskModal, UploadModal, UserSelect, UserMultiSelect, TagPicker, TaskStatusSelect, AvatarStack } from '../components/forms.jsx';
 import { ActivityFeed } from './Dashboard.jsx';
 import {
-  fmtNumber, fmtMoney, fmtDate, fmtDateTime, fmtRelative, fmtDue, fmtPercent, fmtBytes,
+  fmtNumber, fmtMoney, fmtDate, fmtDateTime, fmtRelative, fmtDue, fmtPercent, fmtBytes, todayStr,
 } from '../lib/format.js';
 import {
   CREATOR_STATUSES, OUTREACH_STATUSES, CONTRACT_STATUSES, PLATFORMS, INVOICE_STATUSES, TASK_STATUSES, PAYOUT_STATUSES,
@@ -704,6 +704,20 @@ function TasksTab({ creator, open }) {
   );
 }
 
+const PRIO_SLUG = { Dringend: 'urgent', Hoch: 'high', Normal: 'normal', Niedrig: 'low' };
+
+/** Fälligkeit als kleines Etikett: überfällig (orange), heute, morgen, Datum */
+export function DuePill({ due, done }) {
+  if (!due) return <span className="due-pill none">ohne Datum</span>;
+  const days = Math.round((new Date(due + 'T12:00:00') - new Date(todayStr() + 'T12:00:00')) / 864e5);
+  const cls = done ? 'done' : days < 0 ? 'over' : days === 0 ? 'today' : days <= 2 ? 'soon' : '';
+  const label = done ? fmtDate(due).slice(0, 6)
+    : days < 0 ? (days === -1 ? 'seit gestern' : `${-days} Tage drüber`)
+    : days === 0 ? 'heute' : days === 1 ? 'morgen'
+    : new Date(due + 'T12:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+  return <span className={`due-pill ${cls}`} title={fmtDate(due)}><Icon name="calendar" size={12} />{label}</span>;
+}
+
 export function TaskList({ items, onOpen, compact = false, showCreator = false }) {
   const { toast } = useUi();
   // Sofort umschalten (optimistisch), damit sich die Liste direkt anfühlt
@@ -724,28 +738,34 @@ export function TaskList({ items, onOpen, compact = false, showCreator = false }
     }
   };
   return (
-    <ul className="task-list">
+    <ul className="tl">
       {items.map((t) => {
         const status = statusOf(t);
         const done = status === 'Erledigt';
         return (
-          <li key={t.id} className={`task-row ${done ? 'done' : ''} ${status === 'In Bearbeitung' ? 'doing' : ''}`} onClick={() => onOpen(t)}>
-            <button className={`task-check ${done ? 'on' : ''}`} onClick={(e) => toggle(t, e)} aria-label={done ? 'Wieder öffnen' : 'Als erledigt markieren'}>
-              {done && <Icon name="check" size={13} strokeWidth={2.5} />}
+          <li key={t.id} className={`tl-row prio-${PRIO_SLUG[t.priority] || 'normal'} ${done ? 'done' : ''} ${status === 'In Bearbeitung' ? 'doing' : ''}`}
+            onClick={() => onOpen(t)} title={t.priority !== 'Normal' ? `Priorität: ${t.priority}` : undefined}>
+            <button className={`tl-check ${done ? 'on' : ''}`} onClick={(e) => toggle(t, e)} aria-label={done ? 'Wieder öffnen' : 'Als erledigt markieren'}>
+              {done && <Icon name="check" size={12} strokeWidth={3} />}
             </button>
-            <div className="task-main">
-              <div className="task-title">{t.title}</div>
-              <div className="task-meta">
-                {t.due_date && <span className={t.is_overdue ? 'tone-red' : ''}><Icon name="calendar" size={12} /> {fmtDate(t.due_date)} ({fmtDue(t.due_date)})</span>}
-                {showCreator && t.creator_name && <span><Icon name="user" size={12} /> {t.creator_name}</span>}
-                {t.collaboration_brand && <span><Icon name="briefcase" size={12} /> {t.collaboration_brand}</span>}
-                {!compact && t.assignee_name && <span>→ {t.assignee_name}</span>}
-                {t.for_creator && <span><Icon name="eye" size={12} /> Creator-To-do</span>}
+            <div className="tl-main">
+              <div className="tl-title">
+                <span>{t.title}</span>
+                {['Dringend', 'Hoch'].includes(t.priority) && !done && <span className={`tl-prio ${PRIO_SLUG[t.priority]}`}>{t.priority}</span>}
+                {t.for_creator && <span className="tl-flag" title="Erscheint im Creator-Bereich als To-do"><Icon name="eye" size={11} /> Creator</span>}
               </div>
+              {(showCreator && t.creator_name) || t.collaboration_brand || t.description ? (
+                <div className="tl-meta">
+                  {showCreator && t.creator_name && <span className="tl-creator"><Icon name="user" size={12} />{t.creator_name}</span>}
+                  {t.collaboration_brand && <span><Icon name="briefcase" size={12} />{t.collaboration_brand}</span>}
+                  {!compact && t.description && <span className="tl-desc">{t.description}</span>}
+                </div>
+              ) : null}
             </div>
-            <div className="task-badges">
-              {t.priority !== 'Normal' && !done && <StatusBadge value={t.priority} dot={false} />}
-              <TaskStatusSelect task={{ ...t, status }} onChanged={(s) => setLocal((x) => ({ ...x, [t.id]: s }))} />
+            <div className="tl-side">
+              <DuePill due={t.due_date} done={done} />
+              {!compact && <AvatarStack ids={t.assignee_ids} />}
+              <TaskStatusSelect task={{ ...t, status }} onChanged={(st) => setLocal((x) => ({ ...x, [t.id]: st }))} />
             </div>
           </li>
         );

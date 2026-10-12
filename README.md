@@ -101,6 +101,17 @@ Creator können sich mit einem eigenen Konto anmelden und sehen **nur ihre eigen
 - **Content einreichen:** Creator schicken Links zu ihrem Content; die Kooperation springt auf „Abnahme“ und der zuständige Manager bekommt automatisch eine Aufgabe.
 - **DATEV-Export:** Standard ist SKR03 (Bank 1200, Erlöse 8400 bzw. 8195 bei Kleinunternehmern, Aufwand 4900). Konten sind im Export einstellbar – Format und Kontierung vorher mit dem Steuerberater abstimmen.
 
+## Aufgaben
+
+Jede Aufgabe hat genau einen von drei Status: **Offen** (Standard für neue Aufgaben), **In Bearbeitung**, **Erledigt**. Der Status steht als farbiges Badge direkt in der Liste und lässt sich dort per Klick ändern – wird sofort gespeichert. Oben filtert ihr nach Alle / Offen / In Bearbeitung / Erledigt (mit Anzahl). Erledigte Aufgaben sind durchgestrichen und ausgegraut.
+Aufgaben mit Creator können zusätzlich „im Creator-Bereich als To-do anzeigen“ – der Creator meldet sie dort als erledigt.
+
+## Kalender (Team)
+
+Menüpunkt „Kalender“: Wochenansicht wie in Teams/Outlook (Tag, Arbeitswoche, Woche). Links wählt man aus, wessen Termine man sieht (jede Person hat eine eigene Farbe), und welche Arten angezeigt werden.
+- **Eigene Termine** für sich oder andere anlegen (Klick in eine freie Zeit oder „Neuer Termin“), mit mehreren Teilnehmern, Ort, Creator und Notizen.
+- **Automatisch dabei:** offene Aufgaben (Fälligkeit), Media-Shootings und Abgaben, Deal-Termine (Briefing, Content-Abgabe, Posting – beim zuständigen Manager) und fällige Follow-ups. Klick darauf öffnet den Eintrag.
+
 ## Listen
 
 Reiter „Listen“ im Menü: eigene Kontaktlisten (z. B. „Food-Marken Mannheim“, „Eventagenturen“) mit Firma, Ansprechpartner, Position, E-Mail, Telefon, Website, Instagram, Ort, Status und Notizen. Suche, Statusfilter, CSV-Export und CSV-Import (Spalten wie Firma; Ansprechpartner; E-Mail …).
