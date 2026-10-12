@@ -470,6 +470,41 @@ cookie = adminC;
 r = await call('POST', `/creators/${tom}/portal`, {});
 ok(r.status === 200 && r.data.access.is_active === true && r.data.link, 'Neue Einladung schaltet wieder frei (Passwort-Reset)');
 
+console.log('Mehrere Verantwortliche');
+cookie = adminC;
+{
+  const adminId = (await call('GET', '/auth/me')).data.user.id;
+  r = await call('POST', '/users', { name: 'Anton Test', email: 'anton@test.de', password: 'passwort123', role: 'manager' });
+  const antonId = r.data.user.id;
+  r = await call('POST', '/tasks', { title: 'Gemeinsam', assignee_ids: [adminId, antonId] });
+  const tId = r.data.id;
+  r = await call('GET', `/tasks/${tId}`);
+  ok(r.data.task.assignee_ids.length === 2 && r.data.task.assignee_id === adminId && r.data.task.assignee_name.includes('Anton Test'), 'Aufgabe mit zwei Verantwortlichen');
+  r = await call('GET', `/tasks?assignee_id=${antonId}`);
+  ok(r.data.items.some((x) => x.id === tId), 'Filter findet Aufgabe auch beim zweiten Verantwortlichen');
+  r = await call('POST', '/tasks', { title: 'x', assignee_ids: [999999] });
+  ok(r.status === 422, 'Unbekannter Verantwortlicher abgelehnt');
+  r = await call('PATCH', `/tasks/${tId}`, { assignee_ids: [] });
+  r = await call('GET', `/tasks/${tId}`);
+  ok(r.data.task.assignee_ids.length === 0 && r.data.task.assignee_id === null, 'Verantwortliche entfernt');
+  r = await call('PATCH', `/creators/${tom}`, { manager_ids: [antonId, adminId] });
+  ok(r.status === 200, 'Creator mit zwei Managern');
+  r = await call('GET', `/creators/${tom}`);
+  ok(r.data.creator.manager_ids.join() === `${antonId},${adminId}` && r.data.creator.manager_id === antonId, 'Manager-Reihenfolge gespeichert');
+  r = await call('GET', `/creators?manager_id=${adminId}&archived=all`);
+  ok(r.data.items.some((x) => x.id === tom), 'Creator-Filter findet zweiten Manager');
+  r = await call('PATCH', `/creators/${tom}`, { manager_id: adminId });
+  r = await call('GET', `/creators/${tom}`);
+  ok(r.data.creator.manager_ids.join() === `${adminId}`, 'Alte Einzelauswahl bleibt kompatibel');
+  r = await call('POST', '/media', { client_name: 'K', title: 'Team-Dreh', assignee_ids: [adminId, antonId], shoot_at: `${today}T10:00:00+02:00` });
+  const mid = r.data.id;
+  r = await call('GET', `/team-calendar?start=${today}&end=${today}`);
+  const it = r.data.items.find((x) => x.id === `ms${mid}`);
+  ok(it && it.user_ids.length === 2, 'Kalender zeigt Dreh bei beiden Verantwortlichen');
+  r = await call('GET', '/users');
+  ok(r.data.users.find((u) => u.id === adminId).creator_count >= 1, 'Creator-Anzahl je Manager');
+}
+
 console.log('Team-Kalender');
 cookie = adminC;
 {

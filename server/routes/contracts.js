@@ -1,3 +1,4 @@
+import { namesSql } from '../team.js';
 import { q, one, TODAY } from '../db.js';
 import { HttpError, readJson, idParam, intParam, json } from '../http.js';
 import { v, validate, assertDateRange } from '../validate.js';
@@ -39,13 +40,12 @@ export default function register(route) {
     const page = intParam(query.get('page'), { min: 1, def: 1 });
     const rows = await q(
       `select count(*) over() as total_count, c.id as creator_id, c.display_name as creator_name, c.status as creator_status,
-         u.name as manager_name,
+         ${namesSql('c.manager_ids')} as manager_name,
          coalesce(ct.status, 'Kein Vertrag') as status, ct.start_date, ct.end_date, ct.exclusivity, ct.notice_period, ct.updated_at,
          (ct.status = 'Aktiv' and ct.end_date between ${TODAY} and ${TODAY} + 30) as expiring_soon,
          (select count(*)::int from documents d where d.creator_id = c.id and d.category = 'Verträge') as contract_files
        from creators c
        left join contracts ct on ct.creator_id = c.id
-       left join users u on u.id = c.manager_id
        where ${where.join(' and ')}
        order by array_position(array['Aktiv','Zur Unterschrift','In Vorbereitung','Ausgelaufen','Gekündigt','Kein Vertrag']::text[], coalesce(ct.status, 'Kein Vertrag')),
          ct.end_date asc nulls last, lower(c.display_name)

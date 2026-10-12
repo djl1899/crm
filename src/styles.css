@@ -1027,3 +1027,10 @@ span.cal-chip { cursor: default; }
 .dt-inputs .dt-time { flex: 0 0 128px; }
 .dt-hint { font-size: 12px; }
 @media (max-width: 640px) { .dt-row { grid-template-columns: 1fr; } }
+
+/* Mehrere Teammitglieder */
+.user-multi { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.user-multi.sm { gap: 5px; }
+.user-multi.sm .tcal-att-chip { padding: 2px 9px 2px 3px; font-size: 12px; gap: 5px; }
+.user-multi.sm .tcal-avatar.sm { width: 18px; height: 18px; font-size: 9px; }
+.pf.pf-wide { grid-column: span 2; }

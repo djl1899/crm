@@ -18,7 +18,7 @@ export default function register(route) {
   route('GET', '/users', async () => {
     const users = await q(
       `select ${PUBLIC_USER_FIELDS},
-        (select count(*)::int from creators c where c.manager_id = u.id and c.status <> 'Archiviert') as creator_count
+        (select count(*)::int from creators c where u.id = any(c.manager_ids) and c.status <> 'Archiviert') as creator_count
        from users u where u.role <> 'creator' order by is_active desc, name asc`
     );
     return { users };

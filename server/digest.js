@@ -15,31 +15,31 @@ export async function collectDigest(userId) {
   const [followups, tasks, shoots, deliveries, deadlines, payouts] = await Promise.all([
     q(`select o.creator_id, c.display_name, o.follow_up_date, o.channel, o.subject, (o.follow_up_date < ${TODAY}) as overdue
        from outreach_activities o join creators c on c.id = o.creator_id
-       where o.follow_up_done = false and o.follow_up_date <= ${TODAY} and (o.user_id = $1 or c.manager_id = $1)
+       where o.follow_up_done = false and o.follow_up_date <= ${TODAY} and (o.user_id = $1 or $1 = any(c.manager_ids))
        order by o.follow_up_date limit 30`, [userId]),
     q(`select t.id, t.title, t.due_date, t.priority, c.display_name, (t.due_date < ${TODAY}) as overdue
        from tasks t left join creators c on c.id = t.creator_id
-       where t.status in (${list(OPEN_TASK_STATUSES)}) and t.due_date <= ${TODAY} and t.assignee_id = $1
+       where t.status in (${list(OPEN_TASK_STATUSES)}) and t.due_date <= ${TODAY} and $1 = any(t.assignee_ids)
        order by t.due_date, array_position(array['Dringend','Hoch','Normal','Niedrig']::text[], t.priority) limit 30`, [userId]),
     q(`select m.id, m.client_name, m.title, m.shoot_at, m.shoot_end_at, m.shoot_location,
          ((m.shoot_at at time zone 'Europe/Berlin')::date = ${TODAY}) as today
        from media_projects m
-       where m.status not in (${list(MEDIA_CLOSED_STATUSES)}) and (m.assignee_id = $1 or m.assignee_id is null)
+       where m.status not in (${list(MEDIA_CLOSED_STATUSES)}) and ($1 = any(m.assignee_ids) or cardinality(m.assignee_ids) = 0)
          and (m.shoot_at at time zone 'Europe/Berlin')::date between ${TODAY} and ${TODAY} + 1
        order by m.shoot_at limit 20`, [userId]),
     q(`select m.id, m.client_name, m.title, m.delivery_date, (m.delivery_date < ${TODAY}) as overdue
        from media_projects m
-       where m.status not in (${list(MEDIA_CLOSED_STATUSES)}, 'Geliefert') and (m.assignee_id = $1 or m.assignee_id is null)
+       where m.status not in (${list(MEDIA_CLOSED_STATUSES)}, 'Geliefert') and ($1 = any(m.assignee_ids) or cardinality(m.assignee_ids) = 0)
          and m.delivery_date <= ${TODAY} + 2
        order by m.delivery_date limit 20`, [userId]),
     q(`select co.creator_id, c.display_name, co.brand, co.campaign_name, co.deadline
        from collaborations co join creators c on c.id = co.creator_id
        where co.status not in ('Abgeschlossen', 'Abgebrochen') and co.deadline between ${TODAY} and ${TODAY} + 3
-         and (c.manager_id = $1 or c.manager_id is null)
+         and ($1 = any(c.manager_ids) or cardinality(c.manager_ids) = 0)
        order by co.deadline limit 20`, [userId]),
     q(`select count(*)::int as n, coalesce(sum(f.payout), 0) as sum
        from collab_finance f join creators c on c.id = f.creator_id
-       where f.payout_status = 'Offen' and f.invoice_status = 'Bezahlt' and (c.manager_id = $1 or c.manager_id is null)`, [userId]),
+       where f.payout_status = 'Offen' and f.invoice_status = 'Bezahlt' and ($1 = any(c.manager_ids) or cardinality(c.manager_ids) = 0)`, [userId]),
   ]);
   const payout = payouts[0];
   const empty = !followups.length && !tasks.length && !shoots.length && !deliveries.length && !deadlines.length && !payout.n;

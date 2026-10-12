@@ -4,7 +4,7 @@ import { useApi, useForm, invalidateAll } from '../lib/useApi.js';
 import { useNavigate } from '../lib/router.jsx';
 import { useAuth } from '../lib/auth.jsx';
 import { PageHeader, Button, Card, Field, Select, Spinner, ErrorBox, Avatar, useUi, handleFormError } from '../components/ui.jsx';
-import { UserSelect, TagPicker } from '../components/forms.jsx';
+import { UserMultiSelect, TagPicker } from '../components/forms.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { CREATOR_STATUSES, OUTREACH_STATUSES, PLATFORMS, AVATAR_TYPES } from '../../shared/constants.js';
 
@@ -35,7 +35,7 @@ function CreatorForm({ editId, profile }) {
     display_name: c.display_name || '', first_name: c.first_name || '', last_name: c.last_name || '',
     email: c.email || '', phone: c.phone || '', city: c.city || '', region: c.region || '', country: c.country || (editId ? '' : 'Deutschland'),
     language: c.language || '', niche: c.niche || '', interests: c.interests || '', notes: c.notes || '',
-    manager_id: editId ? (c.manager_id ? String(c.manager_id) : '') : String(user.id),
+    manager_ids: editId ? (c.manager_ids || (c.manager_id ? [c.manager_id] : [])) : [user.id],
     status: c.status || 'Lead', outreach_status: c.outreach_status || 'Noch nicht kontaktiert', contacted: !!c.contacted,
     commission_rate: c.commission_rate ?? '', bio: c.bio || '',
     billing_name: c.billing_name || '', billing_street: c.billing_street || '', billing_zip: c.billing_zip || '', billing_city: c.billing_city || '',
@@ -244,8 +244,8 @@ function CreatorForm({ editId, profile }) {
                   <button type="button" className={v.contacted ? 'active' : ''} onClick={() => f.setValues((x) => ({ ...x, contacted: true }))}>Ja</button>
                 </div>
               </Field>
-              <Field label="Verantwortlicher Manager" error={f.errors.manager_id}>
-                <UserSelect value={v.manager_id} onChange={f.set('manager_id')} />
+              <Field label="Verantwortliche Manager" error={f.errors.manager_ids || f.errors.manager_id} className="span-2">
+                <UserMultiSelect value={v.manager_ids} onChange={(ids) => f.setValues((x) => ({ ...x, manager_ids: ids }))} />
               </Field>
               <Field label="Agenturprovision (%)" error={f.errors.commission_rate} hint="Leer = Standard aus den Einstellungen. Einzelne Kooperationen können abweichen.">
                 <input className="input" type="number" min="0" max="100" step="0.5" value={v.commission_rate} onChange={f.set('commission_rate')} placeholder="Standard" />

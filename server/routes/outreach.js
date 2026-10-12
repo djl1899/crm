@@ -60,7 +60,7 @@ export default function register(route) {
     }[range] || 'true';
     const params = [];
     let extra = '';
-    if (query.get('user_id')) { params.push(intParam(query.get('user_id'), { def: 0 })); extra = ` and (o.user_id = $1 or c.manager_id = $1)`; }
+    if (query.get('user_id')) { params.push(intParam(query.get('user_id'), { def: 0 })); extra = ` and (o.user_id = $1 or $1 = any(c.manager_ids))`; }
     const rows = await q(
       `${SELECT} where o.follow_up_done = false and o.follow_up_date is not null and ${cond}${extra}
        order by o.follow_up_date asc, o.id asc limit 200`,

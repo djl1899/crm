@@ -504,6 +504,55 @@ const MIGRATIONS = [
     `alter table media_projects add column if not exists shoot_end_at timestamptz`,
     `update media_projects set shoot_end_at = shoot_at + interval '2 hours' where shoot_at is not null and shoot_end_at is null`,
   ],
+  // 13: Mehrere Teammitglieder je Creator (Manager), Aufgabe und Media-Projekt (Verantwortliche).
+  //     Das alte Einzelfeld bleibt per Trigger = erste Person der Liste.
+  [
+    `alter table creators add column if not exists manager_ids integer[] not null default '{}'`,
+    `update creators set manager_ids = array[manager_id] where manager_id is not null and cardinality(manager_ids) = 0`,
+    `create or replace function sync_creators_manager_ids() returns trigger language plpgsql as $f$
+     begin
+       if new.manager_ids is null then new.manager_ids := '{}'; end if;
+       if tg_op = 'UPDATE' and new.manager_id is distinct from old.manager_id and new.manager_ids = old.manager_ids then
+         new.manager_ids := case when new.manager_id is null then '{}'::integer[] else array[new.manager_id] end;
+       elsif tg_op = 'INSERT' and cardinality(new.manager_ids) = 0 and new.manager_id is not null then
+         new.manager_ids := array[new.manager_id];
+       end if;
+       new.manager_id := new.manager_ids[1];
+       return new;
+     end $f$`,
+    `drop trigger if exists sync_creators_manager_ids_trg on creators`,
+    `create trigger sync_creators_manager_ids_trg before insert or update on creators for each row execute function sync_creators_manager_ids()`,
+    `alter table tasks add column if not exists assignee_ids integer[] not null default '{}'`,
+    `update tasks set assignee_ids = array[assignee_id] where assignee_id is not null and cardinality(assignee_ids) = 0`,
+    `create or replace function sync_tasks_assignee_ids() returns trigger language plpgsql as $f$
+     begin
+       if new.assignee_ids is null then new.assignee_ids := '{}'; end if;
+       if tg_op = 'UPDATE' and new.assignee_id is distinct from old.assignee_id and new.assignee_ids = old.assignee_ids then
+         new.assignee_ids := case when new.assignee_id is null then '{}'::integer[] else array[new.assignee_id] end;
+       elsif tg_op = 'INSERT' and cardinality(new.assignee_ids) = 0 and new.assignee_id is not null then
+         new.assignee_ids := array[new.assignee_id];
+       end if;
+       new.assignee_id := new.assignee_ids[1];
+       return new;
+     end $f$`,
+    `drop trigger if exists sync_tasks_assignee_ids_trg on tasks`,
+    `create trigger sync_tasks_assignee_ids_trg before insert or update on tasks for each row execute function sync_tasks_assignee_ids()`,
+    `alter table media_projects add column if not exists assignee_ids integer[] not null default '{}'`,
+    `update media_projects set assignee_ids = array[assignee_id] where assignee_id is not null and cardinality(assignee_ids) = 0`,
+    `create or replace function sync_media_projects_assignee_ids() returns trigger language plpgsql as $f$
+     begin
+       if new.assignee_ids is null then new.assignee_ids := '{}'; end if;
+       if tg_op = 'UPDATE' and new.assignee_id is distinct from old.assignee_id and new.assignee_ids = old.assignee_ids then
+         new.assignee_ids := case when new.assignee_id is null then '{}'::integer[] else array[new.assignee_id] end;
+       elsif tg_op = 'INSERT' and cardinality(new.assignee_ids) = 0 and new.assignee_id is not null then
+         new.assignee_ids := array[new.assignee_id];
+       end if;
+       new.assignee_id := new.assignee_ids[1];
+       return new;
+     end $f$`,
+    `drop trigger if exists sync_media_projects_assignee_ids_trg on media_projects`,
+    `create trigger sync_media_projects_assignee_ids_trg before insert or update on media_projects for each row execute function sync_media_projects_assignee_ids()`,
+  ],
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

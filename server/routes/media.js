@@ -1,3 +1,4 @@
+import { namesSql, assertTeamUsers } from '../team.js';
 import { q, one, TODAY } from '../db.js';
 import { HttpError, readJson, idParam, intParam, json } from '../http.js';
 import { v, validate } from '../validate.js';
@@ -22,19 +23,20 @@ const schema = {
   contact_email: v.email({ label: 'E-Mail' }),
   contact_phone: v.str({ label: 'Telefon', max: 40 }),
   assignee_id: v.ref({ label: 'Verantwortlich' }),
+  assignee_ids: v.ids({ label: 'Verantwortlich' }),
   creator_id: v.ref({ label: 'Creator' }),
   notes: v.str({ label: 'Notizen', max: 10000 }),
 };
 
 const SELECT = `
-  select m.*, u.name as assignee_name, c.display_name as creator_name,
+  select m.*, ${namesSql('m.assignee_ids')} as assignee_name, c.display_name as creator_name,
     (m.status not in (${CLOSED_SQL})) as is_open,
     (m.status not in (${CLOSED_SQL}, 'Geliefert') and m.delivery_date < ${TODAY}) as delivery_overdue
   from media_projects m
-  left join users u on u.id = m.assignee_id
   left join creators c on c.id = m.creator_id`;
 
 async function checkRefs(d) {
+  if (d.assignee_ids) await assertTeamUsers(d.assignee_ids, 'assignee_ids', 'Verantwortliche');
   if (d.assignee_id && !(await one(`select id from users where id = $1 and role <> 'creator'`, [d.assignee_id]))) throw new HttpError(422, 'Benutzer nicht gefunden.', { assignee_id: 'Ungültig.' });
   if (d.creator_id && !(await one(`select id from creators where id = $1`, [d.creator_id]))) throw new HttpError(422, 'Creator nicht gefunden.', { creator_id: 'Ungültig.' });
 }
@@ -59,7 +61,7 @@ export default function register(route) {
     if (view === 'open') where.push(`m.status not in (${CLOSED_SQL})`);
     if (view === 'closed') where.push(`m.status in (${CLOSED_SQL})`);
     if (MEDIA_STATUSES.includes(query.get('status'))) where.push(`m.status = ${p(query.get('status'))}`);
-    if (query.get('assignee_id')) where.push(`m.assignee_id = ${p(intParam(query.get('assignee_id'), { def: 0 }))}`);
+    if (query.get('assignee_id')) where.push(`${p(intParam(query.get('assignee_id'), { def: 0 }))} = any(m.assignee_ids)`);
     const s = (query.get('q') || '').trim();
     if (s) {
       const like = p(`%${s}%`);

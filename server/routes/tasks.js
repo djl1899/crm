@@ -1,3 +1,4 @@
+import { namesSql, assertTeamUsers } from '../team.js';
 import { q, one, TODAY } from '../db.js';
 import { HttpError, readJson, idParam, intParam, json } from '../http.js';
 import { v, validate } from '../validate.js';
@@ -11,6 +12,7 @@ const taskSchema = {
   creator_id: v.ref({ label: 'Creator' }),
   collaboration_id: v.ref({ label: 'Kooperation' }),
   assignee_id: v.ref({ label: 'Verantwortlicher' }),
+  assignee_ids: v.ids({ label: 'Verantwortliche' }),
   priority: v.oneOf(TASK_PRIORITIES, { label: 'Priorität', def: 'Normal' }),
   status: v.oneOf(TASK_STATUSES, { label: 'Status', def: 'Offen' }),
   due_date: v.date({ label: 'Fälligkeitsdatum' }),
@@ -20,12 +22,11 @@ const taskSchema = {
 
 const SELECT = `
   select t.*, c.display_name as creator_name, co.brand as collaboration_brand, co.campaign_name as collaboration_campaign,
-    a.name as assignee_name, cb.name as created_by_name,
+    ${namesSql('t.assignee_ids')} as assignee_name, cb.name as created_by_name,
     (t.status in (${OPEN_TASK_SQL}) and t.due_date < ${TODAY}) as is_overdue
   from tasks t
   left join creators c on c.id = t.creator_id
   left join collaborations co on co.id = t.collaboration_id
-  left join users a on a.id = t.assignee_id
   left join users cb on cb.id = t.created_by`;
 
 async function checkRefs(data, existing = {}) {
@@ -39,6 +40,7 @@ async function checkRefs(data, existing = {}) {
     if (creatorId && co.creator_id !== creatorId) throw new HttpError(422, 'Die Kooperation gehört zu einem anderen Creator.', { collaboration_id: 'Passt nicht zum Creator.' });
     if (!creatorId) data.creator_id = co.creator_id;
   }
+  if (data.assignee_ids) await assertTeamUsers(data.assignee_ids, 'assignee_ids', 'Verantwortliche');
   if ('assignee_id' in data && data.assignee_id) {
     if (!(await one(`select id from users where id = $1 and role <> 'creator'`, [data.assignee_id]))) throw new HttpError(422, 'Benutzer nicht gefunden.', { assignee_id: 'Ungültig.' });
   }
@@ -62,9 +64,9 @@ export default function register(route) {
       else if (TASK_STATUSES.includes(status)) where.push(`t.status = ${p(status)}`);
     }
     const assignee = query.get('assignee_id');
-    if (assignee === 'me') where.push(`t.assignee_id = ${p(user.id)}`);
-    else if (assignee === 'none') where.push(`t.assignee_id is null`);
-    else if (assignee) where.push(`t.assignee_id = ${p(intParam(assignee, { def: 0 }))}`);
+    if (assignee === 'me') where.push(`${p(user.id)} = any(t.assignee_ids)`);
+    else if (assignee === 'none') where.push(`cardinality(t.assignee_ids) = 0`);
+    else if (assignee) where.push(`${p(intParam(assignee, { def: 0 }))} = any(t.assignee_ids)`);
     if (query.get('creator_id')) where.push(`t.creator_id = ${p(intParam(query.get('creator_id'), { def: 0 }))}`);
     if (query.get('collaboration_id')) where.push(`t.collaboration_id = ${p(intParam(query.get('collaboration_id'), { def: 0 }))}`);
     if (TASK_PRIORITIES.includes(query.get('priority'))) where.push(`t.priority = ${p(query.get('priority'))}`);

@@ -32,7 +32,9 @@ async function context({ user, req, query }) {
   }
   if (!creatorId) throw new HttpError(403, 'Dieser Bereich ist nur für Creator.');
   const c = await one(
-    `select c.*, u.name as manager_name, u.email as manager_email
+    `select c.*, u.name as manager_name, u.email as manager_email,
+       coalesce((select json_agg(json_build_object('name', m.name, 'email', m.email) order by array_position(c.manager_ids, m.id))
+         from users m where m.id = any(c.manager_ids)), '[]'::json) as managers
      from creators c left join users u on u.id = c.manager_id where c.id = $1`,
     [creatorId]
   );
@@ -337,7 +339,7 @@ export default function register(route) {
       creator: {
         id: c.id, display_name: c.display_name, first_name: c.first_name,
         avatar_url: c.avatar_key ? `/api/portal/avatar?v=${c.avatar_key.slice(-8)}${preview ? `&as=${c.id}` : ''}` : null,
-        manager_name: c.manager_name, manager_email: c.manager_email,
+        manager_name: c.manager_name, manager_email: c.manager_email, managers: c.managers,
         profile_missing: ['billing_street', 'billing_zip', 'billing_city', 'iban'].filter((k) => !c[k]),
         small_business_unknown: c.small_business === null || c.small_business === undefined,
       },
@@ -466,10 +468,10 @@ export default function register(route) {
         [id, links.join('\n'), data.content_note]
       );
       await run(
-        `insert into tasks (title, description, creator_id, collaboration_id, assignee_id, priority, status, due_date, created_by)
+        `insert into tasks (title, description, creator_id, collaboration_id, assignee_ids, priority, status, due_date, created_by)
          values ($1, $2, $3, $4, $5, 'Hoch', 'Offen', ${TODAY} + 2, $6)`,
         [`Content prüfen: ${co.brand}`, `${c.display_name} hat Content eingereicht:\n${links.join('\n')}${data.content_note ? `\n\nNachricht: ${data.content_note}` : ''}`,
-          c.id, id, c.manager_id || null, args.user.id]
+          c.id, id, c.manager_ids || [], args.user.id]
       );
       await logActivity({ creatorId: c.id, userId: args.user.id, entityType: 'collaboration', entityId: id, action: 'content_submitted', message: `hat Content für „${co.brand}“ eingereicht.` }, run);
     });
@@ -709,7 +711,7 @@ export default function register(route) {
     if (profile.tax_buffer_rate === null) profile.tax_buffer_rate = DEFAULT_TAX_BUFFER;
     return {
       profile, socials, platforms: PLATFORMS.map((p) => p.key),
-      readonly: { display_name: c.display_name, manager_name: c.manager_name, manager_email: c.manager_email, commission_rate: c.commission_rate },
+      readonly: { display_name: c.display_name, manager_name: c.manager_name, manager_email: c.manager_email, managers: c.managers, commission_rate: c.commission_rate },
     };
   });
 

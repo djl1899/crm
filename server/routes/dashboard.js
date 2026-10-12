@@ -1,3 +1,4 @@
+import { namesSql } from '../team.js';
 import { q, one, TODAY } from '../db.js';
 import { intParam } from '../http.js';
 import { ACTIVE_COLLAB_SQL, REVENUE_COLLAB_SQL, OPEN_TASK_SQL } from './creators.js';
@@ -61,8 +62,8 @@ export default function register(route) {
          where co.deadline >= ${TODAY} and co.status not in ('Abgeschlossen', 'Abgebrochen')
          order by co.deadline asc limit 6`),
       q(`select t.id, t.title, t.due_date, t.priority, t.status, t.creator_id, c.display_name as creator_name,
-           a.name as assignee_name, (t.due_date < ${TODAY}) as overdue
-         from tasks t left join creators c on c.id = t.creator_id left join users a on a.id = t.assignee_id
+           ${namesSql('t.assignee_ids')} as assignee_name, (t.due_date < ${TODAY}) as overdue
+         from tasks t left join creators c on c.id = t.creator_id
          where t.status in (${OPEN_TASK_SQL})
          order by t.due_date asc nulls last, array_position(array['Dringend','Hoch','Normal','Niedrig']::text[], t.priority) limit 8`),
       q(`select a.id, a.message, a.action, a.created_at, a.creator_id, c.display_name as creator_name, u.name as user_name

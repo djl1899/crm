@@ -8,7 +8,7 @@ import { Modal, Button, Field, Select, TagChip, useUi, handleFormError } from '.
 import { Icon } from './Icon.jsx';
 import {
   OUTREACH_CHANNELS, OUTREACH_STATUSES, OUTREACH_RESULT_SUGGESTIONS, COLLAB_STATUSES, INVOICE_STATUSES,
-  TASK_STATUSES, TASK_PRIORITIES, DOCUMENT_CATEGORIES, CREATOR_VISIBLE_DEFAULT, MAX_UPLOAD_BYTES, ALLOWED_UPLOAD_TYPES, PAYOUT_STATUSES,
+  PERSON_COLORS, TASK_STATUSES, TASK_PRIORITIES, DOCUMENT_CATEGORIES, CREATOR_VISIBLE_DEFAULT, MAX_UPLOAD_BYTES, ALLOWED_UPLOAD_TYPES, PAYOUT_STATUSES,
 } from '../../shared/constants.js';
 
 const fmtMoneyLocal = (n) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(Number.isFinite(n) ? n : 0);
@@ -49,6 +49,28 @@ export function UserSelect({ value, onChange, placeholder = '– niemand –', i
       options={list.map((u) => ({ value: String(u.id), label: u.name + (u.is_active ? '' : ' (inaktiv)') }))}
       {...rest}
     />
+  );
+}
+
+/** Mehrere Teammitglieder auswählen (Chips zum An-/Abwählen). value: Array von IDs, Reihenfolge = Auswahlreihenfolge. */
+export function UserMultiSelect({ value = [], onChange, includeInactive = false, size = 'md', emptyLabel = 'niemand' }) {
+  const { users } = useLookups();
+  const ids = (value || []).map(Number);
+  const byId = [...users].sort((a, b) => a.id - b.id);
+  const colorOf = (id) => PERSON_COLORS[Math.max(0, byId.findIndex((u) => u.id === id)) % PERSON_COLORS.length];
+  const list = users.filter((u) => includeInactive || u.is_active || ids.includes(u.id));
+  const toggle = (id) => onChange(ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
+  return (
+    <div className={`user-multi ${size === 'sm' ? 'sm' : ''}`} role="group">
+      {list.map((u) => (
+        <button type="button" key={u.id} className={`tcal-att-chip ${ids.includes(u.id) ? 'on' : ''}`} style={{ '--c': colorOf(u.id) }}
+          onClick={() => toggle(u.id)} aria-pressed={ids.includes(u.id)}>
+          <span className="tcal-avatar sm" style={{ background: colorOf(u.id) }}>{u.name.split(/\s+/).map((x) => x[0]).slice(0, 2).join('')}</span>
+          {size === 'sm' ? u.name.split(' ')[0] : u.name}{u.is_active ? '' : ' (inaktiv)'}
+        </button>
+      ))}
+      {!ids.length && <span className="small muted">{emptyLabel}</span>}
+    </div>
   );
 }
 
@@ -547,7 +569,7 @@ export function TaskModal({ open, onClose, task, defaults = {} }) {
       creator_id: t.creator_id || defaults.creator?.id || null,
       creator_label: t.creator_name || defaults.creator?.display_name || '',
       collaboration_id: t.collaboration_id ? String(t.collaboration_id) : defaults.collaborationId ? String(defaults.collaborationId) : '',
-      assignee_id: t.id ? (t.assignee_id ? String(t.assignee_id) : '') : String(user.id),
+      assignee_ids: t.id ? (t.assignee_ids || (t.assignee_id ? [t.assignee_id] : [])) : [user.id],
       priority: t.priority || 'Normal', status: t.status || 'Offen', due_date: t.due_date || '', notes: t.notes || '', for_creator: !!t.for_creator,
     });
   }, [open]); // eslint-disable-line
@@ -595,8 +617,8 @@ export function TaskModal({ open, onClose, task, defaults = {} }) {
         <Field label="Kooperation" error={f.errors.collaboration_id} className={fixedCreator ? 'span-2' : ''}>
           <CollaborationSelect creatorId={v.creator_id} value={v.collaboration_id} onChange={f.set('collaboration_id')} />
         </Field>
-        <Field label="Verantwortlicher" error={f.errors.assignee_id}>
-          <UserSelect value={v.assignee_id} onChange={f.set('assignee_id')} />
+        <Field label="Verantwortlich" error={f.errors.assignee_ids || f.errors.assignee_id} className="span-2">
+          <UserMultiSelect value={v.assignee_ids} onChange={(ids) => f.setValues((x) => ({ ...x, assignee_ids: ids }))} />
         </Field>
         <Field label="Fälligkeitsdatum" error={f.errors.due_date}>
           <input type="date" className="input" value={v.due_date || ''} onChange={f.set('due_date')} />

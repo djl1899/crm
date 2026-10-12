@@ -8,7 +8,7 @@ import {
   useUi, handleFormError,
 } from '../components/ui.jsx';
 import { Icon } from '../components/Icon.jsx';
-import { OutreachModal, CollaborationModal, TaskModal, UploadModal, UserSelect, TagPicker, TaskStatusSelect } from '../components/forms.jsx';
+import { OutreachModal, CollaborationModal, TaskModal, UploadModal, UserSelect, UserMultiSelect, TagPicker, TaskStatusSelect } from '../components/forms.jsx';
 import { ActivityFeed } from './Dashboard.jsx';
 import {
   fmtNumber, fmtMoney, fmtDate, fmtDateTime, fmtRelative, fmtDue, fmtPercent, fmtBytes,
@@ -221,10 +221,10 @@ function ProfileHeader({ data, onContact }) {
             <button type="button" className={creator.contacted ? 'active yes' : ''} onClick={() => !creator.contacted && patch({ contacted: true })}>Ja</button>
           </div>
         </div>
-        <label className="pf">
-          <span>Verantwortlicher Manager</span>
-          <UserSelect className="input input-sm" value={creator.manager_id ? String(creator.manager_id) : ''} onChange={(e) => patch({ manager_id: e.target.value || null }, 'Manager geändert.')} />
-        </label>
+        <div className="pf pf-wide">
+          <span>Verantwortliche Manager</span>
+          <UserMultiSelect size="sm" value={creator.manager_ids || (creator.manager_id ? [creator.manager_id] : [])} onChange={(ids) => patch({ manager_ids: ids }, 'Manager geändert.')} />
+        </div>
         <div className="pf">
           <span>Letzter Kontakt</span>
           <strong>{data.last_contact ? <span title={fmtDateTime(data.last_contact.occurred_at)}>{fmtRelative(data.last_contact.occurred_at)} · {data.last_contact.channel}</span> : <span className="muted">noch nie</span>}</strong>

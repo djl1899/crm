@@ -62,14 +62,14 @@ export default function register(route) {
     }
     // 2) Offene Aufgaben mit Fälligkeit
     const tasks = await q(
-      `select t.id, t.title, t.due_date, t.assignee_id, t.priority, c.display_name as creator_name from tasks t left join creators c on c.id = t.creator_id
+      `select t.id, t.title, t.due_date, t.assignee_ids, t.priority, c.display_name as creator_name from tasks t left join creators c on c.id = t.creator_id
        where t.status = any($3::text[]) and t.due_date between $1 and $2`,
       [start, end, OPEN_TASK_STATUSES]
     );
-    for (const t of tasks) items.push({ id: `t${t.id}`, source: 'task', kind: 'Aufgabe', title: t.title + (t.creator_name ? ` · ${t.creator_name}` : ''), date: dstr(t.due_date), all_day: true, user_ids: t.assignee_id ? [t.assignee_id] : [], link: `/tasks?open=${t.id}`, priority: t.priority });
+    for (const t of tasks) items.push({ id: `t${t.id}`, source: 'task', kind: 'Aufgabe', title: t.title + (t.creator_name ? ` · ${t.creator_name}` : ''), date: dstr(t.due_date), all_day: true, user_ids: t.assignee_ids || [], link: `/tasks?open=${t.id}`, priority: t.priority });
     // 3) Media-Produktion: Shooting (mit Uhrzeit) und Abgabe
     const media = await q(
-      `select id, title, client_name, shoot_at, coalesce(shoot_end_at, shoot_at + interval '2 hours') as shoot_end, shoot_location, delivery_date, assignee_id,
+      `select id, title, client_name, shoot_at, coalesce(shoot_end_at, shoot_at + interval '2 hours') as shoot_end, shoot_location, delivery_date, assignee_ids,
          (shoot_at < (($2::date + 1)::timestamp at time zone '${TZ}') and coalesce(shoot_end_at, shoot_at + interval '2 hours') > ($1::date::timestamp at time zone '${TZ}')) as shoot_in
        from media_projects
        where status <> all($3::text[]) and (
@@ -78,7 +78,7 @@ export default function register(route) {
       [start, end, MEDIA_CLOSED_STATUSES]
     );
     for (const m of media) {
-      const uids = m.assignee_id ? [m.assignee_id] : [];
+      const uids = m.assignee_ids || [];
       const s = m.shoot_at ? new Date(m.shoot_at) : null;
       if (s && m.shoot_in) {
         items.push({ id: `ms${m.id}`, source: 'media', kind: 'Shooting', title: `Shooting: ${m.title} (${m.client_name})`, start: s.toISOString(), end: new Date(m.shoot_end).toISOString(), all_day: false, location: m.shoot_location, user_ids: uids, link: `/media?open=${m.id}` });
@@ -88,14 +88,14 @@ export default function register(route) {
     }
     // 4) Deal-Termine (zuständig: Manager des Creators)
     const deals = await q(
-      `select co.id, co.brand, co.deadline, co.publish_date, co.briefing_date, c.display_name, c.manager_id from collaborations co join creators c on c.id = co.creator_id
+      `select co.id, co.brand, co.deadline, co.publish_date, co.briefing_date, c.display_name, c.manager_ids from collaborations co join creators c on c.id = co.creator_id
        where co.status not in ('Abgebrochen', 'Abgeschlossen') and (co.deadline between $1 and $2 or co.publish_date between $1 and $2 or co.briefing_date between $1 and $2)`,
       [start, end]
     );
     for (const d of deals) {
       for (const [field, label] of [['briefing_date', 'Briefing'], ['deadline', 'Content-Abgabe'], ['publish_date', 'Posting']]) {
         const x = dstr(d[field]);
-        if (x && x >= start && x <= end) items.push({ id: `d${d.id}-${field}`, source: 'deal', kind: label, title: `${label}: ${d.brand} · ${d.display_name}`, date: x, all_day: true, user_ids: d.manager_id ? [d.manager_id] : [], link: `/collaborations?open=${d.id}` });
+        if (x && x >= start && x <= end) items.push({ id: `d${d.id}-${field}`, source: 'deal', kind: label, title: `${label}: ${d.brand} · ${d.display_name}`, date: x, all_day: true, user_ids: d.manager_ids || [], link: `/collaborations?open=${d.id}` });
       }
     }
     // 5) Fällige Follow-ups

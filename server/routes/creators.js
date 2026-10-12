@@ -1,3 +1,4 @@
+import { namesSql, assertTeamUsers } from '../team.js';
 import { q, one, tx, TODAY } from '../db.js';
 import { HttpError, readJson, idParam, intParam, json } from '../http.js';
 import { v, validate } from '../validate.js';
@@ -54,6 +55,7 @@ export const creatorSchema = {
   interests: v.str({ label: 'Interessen', max: 1000 }),
   notes: v.str({ label: 'Notizen', max: 20000 }),
   manager_id: v.ref({ label: 'Verantwortlicher Manager' }),
+  manager_ids: v.ids({ label: 'Manager' }),
   status: v.oneOf(CREATOR_STATUSES, { label: 'Creator Status', def: 'Lead' }),
   outreach_status: v.oneOf(OUTREACH_STATUSES, { label: 'Outreach Status', def: 'Noch nicht kontaktiert' }),
   contacted: v.bool({ label: 'Bereits angeschrieben' }),
@@ -140,7 +142,8 @@ async function saveTags(run, creatorId, tagIds) {
   }
 }
 
-async function assertManager(managerId) {
+async function assertManager(managerId, managerIds) {
+  if (managerIds && managerIds.length) await assertTeamUsers(managerIds, 'manager_ids', 'Manager');
   if (!managerId) return;
   const m = await one(`select id from users where id = $1 and role <> 'creator'`, [managerId]);
   if (!m) throw new HttpError(422, 'Der ausgewählte Manager existiert nicht.', { manager_id: 'Ungültig.' });
@@ -194,8 +197,8 @@ function buildListQuery(qs) {
   if (niche) where.push(`c.niche ilike ${p(`%${niche}%`)}`);
 
   const manager = qs.get('manager_id');
-  if (manager === 'none') where.push(`c.manager_id is null`);
-  else if (manager) where.push(`c.manager_id = ${p(intParam(manager, { def: 0 }))}`);
+  if (manager === 'none') where.push(`cardinality(c.manager_ids) = 0`);
+  else if (manager) where.push(`${p(intParam(manager, { def: 0 }))} = any(c.manager_ids)`);
 
   const contacted = qs.get('contacted');
   if (contacted === 'yes') where.push(`c.contacted = true`);
@@ -240,7 +243,7 @@ export default function register(route) {
     const rows = await q(
       `select c.id, c.display_name, c.first_name, c.last_name, c.email, c.city, c.region, c.country, c.niche,
         c.status, c.outreach_status, c.contacted, c.notes, c.avatar_key, c.last_activity_at, c.created_at,
-        c.manager_id, u.name as manager_name,
+        c.manager_id, c.manager_ids, ${namesSql('c.manager_ids')} as manager_name,
         ig.username as instagram_username, ig.url as instagram_url, ig.followers as instagram_followers,
         tt.username as tiktok_username, tt.url as tiktok_url, tt.followers as tiktok_followers,
         coalesce(ct.status, 'Kein Vertrag') as contract_status,
@@ -289,7 +292,7 @@ export default function register(route) {
     const data = validate(body, creatorSchema);
     const socials = validateSocials(body);
     const tagIds = v.ids({ label: 'Tags' })(body.tag_ids);
-    await assertManager(data.manager_id);
+    await assertManager(data.manager_id, data.manager_ids);
     if (data.outreach_status !== 'Noch nicht kontaktiert' && body.contacted === undefined) data.contacted = true;
 
     const creator = await tx(async (run) => {
@@ -311,8 +314,8 @@ export default function register(route) {
   route('GET', '/creators/:id', async ({ params }) => {
     const id = idParam(params.id);
     const c = await one(
-      `select c.*, u.name as manager_name, cb.name as created_by_name
-       from creators c left join users u on u.id = c.manager_id left join users cb on cb.id = c.created_by
+      `select c.*, ${namesSql('c.manager_ids')} as manager_name, cb.name as created_by_name
+       from creators c left join users cb on cb.id = c.created_by
        where c.id = $1`,
       [id]
     );
@@ -361,7 +364,7 @@ export default function register(route) {
     const tagIds = 'tag_ids' in body ? v.ids({ label: 'Tags' })(body.tag_ids) : null;
     const before = await one(`select c.*, u.name as manager_name from creators c left join users u on u.id = c.manager_id where c.id = $1`, [id]);
     if (!before) throw new HttpError(404, 'Creator nicht gefunden.');
-    if ('manager_id' in data) await assertManager(data.manager_id);
+    if ('manager_id' in data || 'manager_ids' in data) await assertManager(data.manager_id, data.manager_ids);
     const beforeSocials = await q(`select platform, username, url, followers, engagement_rate, notes from social_accounts where creator_id = $1`, [id]);
     const beforeTags = await q(`select tag_id from creator_tags where creator_id = $1`, [id]);
 
@@ -388,9 +391,10 @@ export default function register(route) {
       if ('contacted' in data && data.contacted !== before.contacted) {
         await log('contacted_changed', `hat „Bereits angeschrieben“ auf '${data.contacted ? 'Ja' : 'Nein'}' gesetzt.`);
       }
-      if ('manager_id' in data && data.manager_id !== before.manager_id) {
-        const m = data.manager_id ? await run(`select name from users where id = $1`, [data.manager_id]) : [];
-        await log('manager_changed', `hat den verantwortlichen Manager auf '${m[0]?.name || 'niemand'}' gesetzt.`);
+      const newIds = 'manager_ids' in data ? data.manager_ids : 'manager_id' in data ? (data.manager_id ? [data.manager_id] : []) : null;
+      if (newIds && newIds.join(',') !== (before.manager_ids || []).join(',')) {
+        const m = newIds.length ? await run(`select name from users where id = any($1::int[]) order by array_position($1::int[], id)`, [newIds]) : [];
+        await log('manager_changed', `hat die Manager auf '${m.map((x) => x.name).join(', ') || 'niemand'}' gesetzt.`);
       }
       const changed = Object.keys(FIELD_LABELS).filter((k) => k in data && (data[k] ?? null) !== (before[k] ?? null));
       const norm = (x) => (x ? JSON.stringify([x.username, x.url, x.followers, x.engagement_rate === null ? null : Number(x.engagement_rate), x.notes]) : null);

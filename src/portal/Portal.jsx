@@ -229,14 +229,18 @@ function HomePage() {
           </Card>
         </div>
         <div className="stack-lg">
-          {creator.manager_name && (
-            <Card title="Dein Ansprechpartner">
-              <div className="row">
-                <Avatar name={creator.manager_name} size={40} />
-                <div>
-                  <div className="strong">{creator.manager_name}</div>
-                  {creator.manager_email && <a className="link small" href={`mailto:${creator.manager_email}`}>{creator.manager_email}</a>}
-                </div>
+          {creator.managers?.length > 0 && (
+            <Card title={creator.managers.length > 1 ? 'Deine Ansprechpartner' : 'Dein Ansprechpartner'}>
+              <div className="stack">
+                {creator.managers.map((m) => (
+                  <div key={m.email} className="row">
+                    <Avatar name={m.name} size={40} />
+                    <div>
+                      <div className="strong">{m.name}</div>
+                      {m.email && <a className="link small" href={`mailto:${m.email}`}>{m.email}</a>}
+                    </div>
+                  </div>
+                ))}
               </div>
             </Card>
           )}
@@ -1256,8 +1260,10 @@ function ProfileForm({ data }) {
             </Card>
             <Card title="Dein Management">
               <dl className="facts">
-                <dt>Ansprechpartner</dt><dd>{data.readonly.manager_name || '–'}</dd>
-                {data.readonly.manager_email && <><dt>E-Mail</dt><dd><a className="link" href={`mailto:${data.readonly.manager_email}`}>{data.readonly.manager_email}</a></dd></>}
+                <dt>{data.readonly.managers?.length > 1 ? 'Ansprechpartner' : 'Ansprechpartner'}</dt>
+                <dd>{data.readonly.managers?.length ? data.readonly.managers.map((m) => (
+                  <div key={m.email}>{m.name}{m.email && <> · <a className="link" href={`mailto:${m.email}`}>{m.email}</a></>}</div>
+                )) : '–'}</dd>
                 {data.readonly.commission_rate != null && <><dt>LLK-Provision</dt><dd>{pct(data.readonly.commission_rate)}</dd></>}
               </dl>
             </Card>

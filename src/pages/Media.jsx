@@ -8,7 +8,7 @@ import {
   useUi, handleFormError,
 } from '../components/ui.jsx';
 import { Icon } from '../components/Icon.jsx';
-import { UserSelect, CreatorPicker } from '../components/forms.jsx';
+import { UserMultiSelect, CreatorPicker } from '../components/forms.jsx';
 import { DateTimeRange, rangeToParts, partsToRange } from '../components/DateTimeRange.jsx';
 import { fmtMoney, fmtDate, fmtDue, fmtDateTime } from '../lib/format.js';
 import { MEDIA_STATUSES, MEDIA_TYPES, INVOICE_STATUSES } from '../../shared/constants.js';
@@ -205,7 +205,7 @@ function MediaModal({ open, item, onClose }) {
       shoot: rangeToParts(m.shoot_at, m.shoot_end_at, { defaultMinutes: 120 }), shoot_location: m.shoot_location || '', delivery_date: m.delivery_date || '',
       deliverables: m.deliverables || '', price: m.price ?? '', invoice_status: m.invoice_status || 'Nicht erstellt',
       contact_name: m.contact_name || '', contact_email: m.contact_email || '', contact_phone: m.contact_phone || '',
-      assignee_id: m.id ? (m.assignee_id ? String(m.assignee_id) : '') : String(user.id),
+      assignee_ids: m.id ? (m.assignee_ids || (m.assignee_id ? [m.assignee_id] : [])) : [user.id],
       creator_id: m.creator_id || null, creator_label: m.creator_name || '', notes: m.notes || '',
     });
   }, [open]); // eslint-disable-line
@@ -283,8 +283,8 @@ function MediaModal({ open, item, onClose }) {
         <Field label="Abgabe an Kunden bis" error={f.errors.delivery_date} hint="Wann will der Kunde die Videos/Fotos?">
           <input className="input" type="date" value={v.delivery_date || ''} onChange={f.set('delivery_date')} />
         </Field>
-        <Field label="Verantwortlich" error={f.errors.assignee_id}>
-          <UserSelect value={v.assignee_id} onChange={f.set('assignee_id')} includeInactive />
+        <Field label="Verantwortlich" error={f.errors.assignee_ids || f.errors.assignee_id} className="span-2">
+          <UserMultiSelect value={v.assignee_ids} onChange={(ids) => f.setValues((x) => ({ ...x, assignee_ids: ids }))} />
         </Field>
         <Field label="Leistungen / Deliverables" error={f.errors.deliverables} className="span-2">
           <textarea className="input" rows={2} value={v.deliverables || ''} onChange={f.set('deliverables')} placeholder="z. B. 3 Reels (9:16), 20 bearbeitete Fotos, Rohmaterial" />
