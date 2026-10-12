@@ -106,6 +106,16 @@ Creator können sich mit einem eigenen Konto anmelden und sehen **nur ihre eigen
 Jede Aufgabe hat genau einen von drei Status: **Offen** (Standard für neue Aufgaben), **In Bearbeitung**, **Erledigt**. Der Status steht als farbiges Badge direkt in der Liste und lässt sich dort per Klick ändern – wird sofort gespeichert. Oben filtert ihr nach Alle / Offen / In Bearbeitung / Erledigt (mit Anzahl). Erledigte Aufgaben sind durchgestrichen und ausgegraut.
 Aufgaben mit Creator können zusätzlich „im Creator-Bereich als To-do anzeigen“ – der Creator meldet sie dort als erledigt.
 
+## Map
+
+Menüpunkt „Map“: alle Creator und Firmen (Kontakte aus den Listen) auf der Karte.
+- **Filter:** Alle / Creator / Firmen, Suche, Kategorien (z. B. Food, Fashion, Beauty – aus der Nische der Creator bzw. Kategorie/Branche der Firmen), Creator-Status, Liste.
+- **Darstellung:** Kreis = Creator, Quadrat = Firma, Farbe = Kategorie. Liegen viele Einträge nah beieinander, erscheint ein Ring mit der Anzahl; Klick zoomt hinein bzw. zeigt die Liste.
+- **Position:** Creator stehen in der Mitte ihres Wohnorts, Firmen an ihrer Adresse (Feld „Adresse“ in der Liste). Mit „Pin setzen“ setzt ihr den genauen Punkt per Klick.
+- **Orte:** Rund 150 Städte (inkl. Rhein-Neckar) sind eingebaut. Andere Orte und Adressen sucht der Browser einmalig über OpenStreetMap und das CRM merkt sie sich.
+- **Kartendaten:** © OpenStreetMap-Mitwirkende. Die Kartenkacheln lädt der Browser direkt von tile.openstreetmap.org.
+- **Alte App-Daten:** Liegen im früheren App-Bereich noch Creator/Firmen, bietet die Map an, sie zu übernehmen (Creator als „Lead“, inaktive als „Archiviert“; Firmen in die Liste „Firmen aus der Recherche“).
+
 ## Kalender (Team)
 
 Menüpunkt „Kalender“: Wochenansicht wie in Teams/Outlook (Tag, Arbeitswoche, Woche). Links wählt man aus, wessen Termine man sieht (jede Person hat eine eigene Farbe), und welche Arten angezeigt werden.

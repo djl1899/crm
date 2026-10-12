@@ -9,6 +9,7 @@ import { useDebounced } from '../lib/useApi.js';
 const NAV = [
   { to: '/', label: 'Dashboard', icon: 'dashboard' },
   { to: '/kalender', label: 'Kalender', icon: 'calendar' },
+  { to: '/map', label: 'Map', icon: 'pin' },
   { to: '/creators', label: 'Creator', icon: 'users' },
   { to: '/collaborations', label: 'Kooperationen', icon: 'briefcase' },
   { to: '/tasks', label: 'Aufgaben', icon: 'tasks' },

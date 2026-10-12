@@ -20,6 +20,9 @@ const contactSchema = {
   website: v.str({ label: 'Website', max: 300 }),
   instagram: v.str({ label: 'Instagram', max: 120 }),
   city: v.str({ label: 'Ort', max: 120 }),
+  address: v.str({ label: 'Adresse', max: 200 }),
+  category: v.str({ label: 'Kategorie', max: 60 }),
+  industry: v.str({ label: 'Branche', max: 120 }),
   status: v.oneOf(CONTACT_STATUSES, { label: 'Status', def: 'Neu' }),
   notes: v.str({ label: 'Notizen', max: 5000 }),
   last_contacted_on: v.date({ label: 'Zuletzt kontaktiert' }),
@@ -30,7 +33,7 @@ const csvCell = (x) => {
   const s = x === null || x === undefined ? '' : String(x);
   return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
-const CSV_HEADERS = ['Firma', 'Ansprechpartner', 'Position', 'E-Mail', 'Telefon', 'Website', 'Instagram', 'Ort', 'Status', 'Notizen', 'Zuletzt kontaktiert'];
+const CSV_HEADERS = ['Firma', 'Ansprechpartner', 'Position', 'E-Mail', 'Telefon', 'Website', 'Instagram', 'Ort', 'Adresse', 'Kategorie', 'Branche', 'Status', 'Notizen', 'Zuletzt kontaktiert'];
 
 function parseCsv(text) {
   text = text.replace(/^﻿/, '');
@@ -63,7 +66,8 @@ const HEADER_MAP = {
   telefon: 'phone', phone: 'phone', tel: 'phone',
   website: 'website', web: 'website',
   instagram: 'instagram', insta: 'instagram',
-  ort: 'city', stadt: 'city', city: 'city',
+  ort: 'city', stadt: 'city', city: 'city', adresse: 'address', anschrift: 'address', straße: 'address', strasse: 'address', address: 'address',
+  kategorie: 'category', category: 'category', branche: 'industry', industry: 'industry',
   status: 'status', notizen: 'notes', notiz: 'notes', notes: 'notes',
 };
 
@@ -103,7 +107,7 @@ export default function register(route) {
     let where = '';
     if (search) {
       args.push(`%${search.toLowerCase()}%`);
-      where += ` and lower(concat_ws(' ', company, name, position, email, city, instagram, notes)) like $${args.length}`;
+      where += ` and lower(concat_ws(' ', company, name, position, email, city, address, category, industry, instagram, notes)) like $${args.length}`;
     }
     if (status && CONTACT_STATUSES.includes(status)) {
       args.push(status);
@@ -165,7 +169,7 @@ export default function register(route) {
     const id = idParam(params.id);
     const list = await loadList(id);
     const rows = await q(`select * from list_contacts where list_id = $1 order by lower(coalesce(company, name, '')), id`, [id]);
-    const lines = [CSV_HEADERS, ...rows.map((r) => [r.company, r.name, r.position, r.email, r.phone, r.website, r.instagram, r.city, r.status, r.notes,
+    const lines = [CSV_HEADERS, ...rows.map((r) => [r.company, r.name, r.position, r.email, r.phone, r.website, r.instagram, r.city, r.address, r.category, r.industry, r.status, r.notes,
       r.last_contacted_on ? new Date(r.last_contacted_on).toISOString().slice(0, 10) : ''])];
     const csv = '﻿' + lines.map((r) => r.map(csvCell).join(';')).join('\r\n') + '\r\n';
     const name = list.name.replace(/[^A-Za-z0-9._-]+/g, '_');

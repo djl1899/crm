@@ -20,6 +20,7 @@ import { InvitePage } from './pages/Invite.jsx';
 import { PortalApp } from './portal/Portal.jsx';
 import { ListsPage } from './pages/Lists.jsx';
 import { TeamCalendarPage } from './pages/TeamCalendar.jsx';
+import { MapPage } from './pages/MapPage.jsx';
 
 const ROUTES = [
   ['/', DashboardPage],
@@ -36,6 +37,7 @@ const ROUTES = [
   ['/users', UsersPage],
   ['/settings', SettingsPage],
   ['/kalender', TeamCalendarPage],
+  ['/map', MapPage],
   ['/listen', ListsPage],
   ['/listen/:id', ListsPage],
   ['/leitfaeden', GuidesPage],

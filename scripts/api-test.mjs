@@ -252,7 +252,7 @@ const creatorC = cookie;
 r = await call('POST', '/auth/invite', { token: inviteToken, password: 'creator-pass-2' });
 ok(r.status === 410, 'Einladungslink nur einmal nutzbar');
 cookie = creatorC;
-for (const path of ['/creators', '/users', '/dashboard', '/collaborations', '/finance/summary', '/documents', '/tasks', `/creators/${tom}`, '/settings', '/search?q=to', '/team-calendar?start=2026-10-01&end=2026-10-07']) {
+for (const path of ['/creators', '/users', '/dashboard', '/collaborations', '/finance/summary', '/documents', '/tasks', `/creators/${tom}`, '/settings', '/search?q=to', '/map', '/team-calendar?start=2026-10-01&end=2026-10-07']) {
   r = await call('GET', path);
   ok(r.status === 403, `Creator gesperrt: GET ${path}`);
 }
@@ -503,6 +503,46 @@ cookie = adminC;
   ok(it && it.user_ids.length === 2, 'Kalender zeigt Dreh bei beiden Verantwortlichen');
   r = await call('GET', '/users');
   ok(r.data.users.find((u) => u.id === adminId).creator_count >= 1, 'Creator-Anzahl je Manager');
+}
+
+console.log('Map');
+cookie = adminC;
+{
+  r = await call('POST', '/creators', { display_name: 'Map Mannheim', city: 'Mannheim', niche: 'Food, Lifestyle' });
+  const mc = r.data.creator?.id ?? r.data.id;
+  r = await call('POST', '/creators', { display_name: 'Map Dorf', city: 'Kleinkleckersdorf' });
+  const md = r.data.creator?.id ?? r.data.id;
+  r = await call('GET', '/map');
+  let it = r.data.items.find((x) => x.key === `c${mc}`);
+  ok(r.status === 200 && it && it.precision === 'city' && Math.abs(it.lat - 49.4875) < 0.01 && it.categories.includes('Food'), 'Creator mit Ort und Kategorie auf der Karte');
+  ok(r.data.missing.some((m) => m.query === 'Kleinkleckersdorf'), 'Unbekannter Ort wird zur Suche gemeldet');
+  const key = r.data.missing.find((m) => m.query === 'Kleinkleckersdorf').key;
+  r = await call('POST', '/map/places', { places: [{ key, query: 'Kleinkleckersdorf', lat: 50.1, lng: 9.2, label: 'Testort' }, { key: 'x', lat: 999, lng: 1 }] });
+  ok(r.data.saved === 1, 'Gefundener Ort gespeichert, ungültige Koordinaten ignoriert');
+  r = await call('GET', '/map');
+  it = r.data.items.find((x) => x.key === `c${md}`);
+  ok(it && it.lat === 50.1 && !r.data.missing.some((m) => m.key === key), 'Gespeicherter Ort wird verwendet');
+  r = await call('PATCH', '/map/position', { type: 'creator', id: mc, lat: 49.4901, lng: 8.4702 });
+  ok(r.status === 200, 'Pin von Hand gesetzt');
+  r = await call('GET', '/map');
+  it = r.data.items.find((x) => x.key === `c${mc}`);
+  ok(it.precision === 'manual' && it.lat === 49.4901, 'Manuelle Position hat Vorrang');
+  r = await call('PATCH', '/map/position', { type: 'creator', id: mc, lat: 95, lng: 8 });
+  ok(r.status === 422, 'Ungültige Koordinaten abgelehnt');
+  r = await call('PATCH', '/map/position', { type: 'creator', id: mc, lat: null, lng: null });
+  r = await call('GET', '/map');
+  ok(r.data.items.find((x) => x.key === `c${mc}`).precision === 'city', 'Position zurückgesetzt');
+  r = await call('POST', '/lists', { name: 'Map-Firmen' });
+  const lid = r.data.list.id;
+  r = await call('POST', `/lists/${lid}/contacts`, { company: 'Matcha Test', city: 'Heidelberg', address: 'Hauptstraße 1', industry: 'Matcha-Bar' });
+  const fid = r.data.contact.id;
+  r = await call('GET', '/map?archived=1');
+  it = r.data.items.find((x) => x.key === `f${fid}`);
+  ok(it && it.type === 'firm' && it.categories.includes('Food') && it.precision === 'city', 'Firma: Kategorie aus Branche, erst Ortsmitte');
+  ok(r.data.missing.some((m) => m.kind === 'address' && m.query.includes('Hauptstraße 1')), 'Adresse wird zur genauen Suche gemeldet');
+  r = await call('POST', '/map/app-import');
+  ok(r.status === 200 || r.status === 404, 'App-Übernahme ohne Daten läuft durch');
+  await call('DELETE', `/lists/${lid}`);
 }
 
 console.log('Team-Kalender');

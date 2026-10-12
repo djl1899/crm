@@ -22,6 +22,7 @@ import guideRoutes from './routes/guides.js';
 import portalCreatorRoutes from './routes/portal-creator.js';
 import listRoutes from './routes/lists.js';
 import calendarRoutes from './routes/calendar.js';
+import mapRoutes from './routes/map.js';
 
 const routes = [];
 
@@ -42,7 +43,7 @@ function route(method, pattern, handler, { auth = true, portal = false } = {}) {
 for (const register of [
   authRoutes, userRoutes, creatorRoutes, outreachRoutes, collaborationRoutes, taskRoutes,
   contractRoutes, tagRoutes, dashboardRoutes, seedRoutes, expenseRoutes, mediaRoutes, exportRoutes, settingsRoutes, mediakitRoutes,
-  portalRoutes, portalCreatorRoutes, guideRoutes, listRoutes, calendarRoutes,
+  portalRoutes, portalCreatorRoutes, guideRoutes, listRoutes, calendarRoutes, mapRoutes,
 ]) {
   register(route);
 }

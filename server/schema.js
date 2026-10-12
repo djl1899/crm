@@ -553,6 +553,25 @@ const MIGRATIONS = [
     `drop trigger if exists sync_media_projects_assignee_ids_trg on media_projects`,
     `create trigger sync_media_projects_assignee_ids_trg before insert or update on media_projects for each row execute function sync_media_projects_assignee_ids()`,
   ],
+  // 14: Karte – Koordinaten, Orts-Cache, Kategorie/Adresse für Listen-Kontakte
+  [
+    `create table if not exists geo_places (
+      key text primary key,
+      query text,
+      label text,
+      lat double precision,
+      lng double precision,
+      source text not null default 'osm',
+      created_at timestamptz not null default now()
+    )`,
+    `alter table creators add column if not exists lat double precision`,
+    `alter table creators add column if not exists lng double precision`,
+    `alter table list_contacts add column if not exists category text`,
+    `alter table list_contacts add column if not exists industry text`,
+    `alter table list_contacts add column if not exists address text`,
+    `alter table list_contacts add column if not exists lat double precision`,
+    `alter table list_contacts add column if not exists lng double precision`,
+  ],
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

@@ -7,6 +7,7 @@ import { PageHeader, Button, Card, Modal, Field, Select, Spinner, ErrorBox, Empt
 import { Icon } from '../components/Icon.jsx';
 import { fmtDate, todayStr } from '../lib/format.js';
 import { CONTACT_STATUSES, TAG_COLORS } from '../../shared/constants.js';
+import { CATEGORIES } from '../../shared/geo.js';
 
 const STATUS_TONE = { Neu: 'gray', Kontaktiert: 'blue', 'Im Gespräch': 'amber', Kunde: 'green', 'Kein Interesse': 'muted' };
 
@@ -121,7 +122,7 @@ function ListDetail({ id, onEdit, onDeleted }) {
                       {c.phone && <div><a className="link" href={`tel:${c.phone}`}>{c.phone}</a></div>}
                       {!c.email && !c.phone && <span className="muted">–</span>}
                     </td>
-                    <td>{c.city || '–'}</td>
+                    <td>{c.city || '–'}{c.category && <div><span className="tl-flag">{c.category}</span></div>}</td>
                     <td>
                       <select className={`status-select badge badge-${STATUS_TONE[c.status]}`} value={c.status} onChange={(e) => setContactStatus(c, e.target.value)} aria-label="Status">
                         {CONTACT_STATUSES.map((s) => <option key={s}>{s}</option>)}
@@ -193,7 +194,7 @@ function ContactModal({ listId, contact, onClose }) {
   useEffect(() => {
     if (!contact) return;
     f.setErrors({});
-    const keys = ['company', 'name', 'position', 'email', 'phone', 'website', 'instagram', 'city', 'notes'];
+    const keys = ['company', 'name', 'position', 'email', 'phone', 'website', 'instagram', 'city', 'address', 'category', 'industry', 'notes'];
     f.setValues({ ...Object.fromEntries(keys.map((k) => [k, contact[k] || ''])), status: contact.status || 'Neu', last_contacted_on: contact.last_contacted_on ? String(contact.last_contacted_on).slice(0, 10) : '' });
   }, [contact]); // eslint-disable-line
   const save = async (e) => {
@@ -238,6 +239,12 @@ function ContactModal({ listId, contact, onClose }) {
         {F('name', 'Ansprechpartner')}
         {F('position', 'Position', { placeholder: 'z. B. Marketing, Inhaber' })}
         {F('city', 'Ort')}
+        {F('address', 'Adresse', { placeholder: 'Straße und Hausnummer – für die Karte', span: true })}
+        <Field label="Kategorie" error={f.errors.category}>
+          <input className="input" list="contact-cats" value={f.values.category || ''} onChange={f.set('category')} placeholder="z. B. Food, Fashion" />
+          <datalist id="contact-cats">{CATEGORIES.map((c) => <option key={c.name} value={c.name} />)}</datalist>
+        </Field>
+        {F('industry', 'Branche', { placeholder: 'z. B. Matcha-Bar, Eisdiele' })}
         {F('email', 'E-Mail', { type: 'email' })}
         {F('phone', 'Telefon', { type: 'tel' })}
         {F('website', 'Website', { placeholder: 'www.…' })}
