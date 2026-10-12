@@ -19,6 +19,7 @@ import { GuidesPage, GuideViewPage } from './pages/Guides.jsx';
 import { InvitePage } from './pages/Invite.jsx';
 import { PortalApp } from './portal/Portal.jsx';
 import { ListsPage } from './pages/Lists.jsx';
+import { TeamCalendarPage } from './pages/TeamCalendar.jsx';
 
 const ROUTES = [
   ['/', DashboardPage],
@@ -34,6 +35,7 @@ const ROUTES = [
   ['/media', MediaPage],
   ['/users', UsersPage],
   ['/settings', SettingsPage],
+  ['/kalender', TeamCalendarPage],
   ['/listen', ListsPage],
   ['/listen/:id', ListsPage],
   ['/leitfaeden', GuidesPage],

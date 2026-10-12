@@ -238,7 +238,7 @@ const creatorC = cookie;
 r = await call('POST', '/auth/invite', { token: inviteToken, password: 'creator-pass-2' });
 ok(r.status === 410, 'Einladungslink nur einmal nutzbar');
 cookie = creatorC;
-for (const path of ['/creators', '/users', '/dashboard', '/collaborations', '/finance/summary', '/documents', '/tasks', `/creators/${tom}`, '/settings', '/search?q=to']) {
+for (const path of ['/creators', '/users', '/dashboard', '/collaborations', '/finance/summary', '/documents', '/tasks', `/creators/${tom}`, '/settings', '/search?q=to', '/team-calendar?start=2026-10-01&end=2026-10-07']) {
   r = await call('GET', path);
   ok(r.status === 403, `Creator gesperrt: GET ${path}`);
 }
@@ -442,6 +442,38 @@ ok(r.status === 401, 'Gesperrter Creator sofort abgemeldet');
 cookie = adminC;
 r = await call('POST', `/creators/${tom}/portal`, {});
 ok(r.status === 200 && r.data.access.is_active === true && r.data.link, 'Neue Einladung schaltet wieder frei (Passwort-Reset)');
+
+console.log('Team-Kalender');
+cookie = adminC;
+{
+  const wk = today;
+  const adminId = (await call('GET', '/auth/me')).data.user.id;
+  r = await call('POST', '/team-events', { title: 'Shooting Anna', kind: 'Shooting', starts_at: `${wk}T10:00:00+02:00`, ends_at: `${wk}T12:00:00+02:00`, attendee_ids: [maxId], location: 'Studio' });
+  ok(r.status === 201, 'Termin für andere Person angelegt');
+  const evId = r.data.id;
+  r = await call('POST', '/team-events', { title: 'Kaputt', starts_at: `${wk}T12:00:00+02:00`, ends_at: `${wk}T10:00:00+02:00` });
+  ok(r.status === 422, 'Ende vor Beginn abgelehnt');
+  r = await call('POST', '/team-events', { title: 'x', starts_at: `${wk}T10:00:00Z`, ends_at: `${wk}T11:00:00Z`, attendee_ids: [999999] });
+  ok(r.status === 422, 'Unbekannter Teilnehmer abgelehnt');
+  r = await call('POST', '/team-events', { title: 'Urlaub', kind: 'Blocker', all_day: true, starts_at: `${wk}T00:00:00+02:00`, ends_at: `${wk}T23:59:00+02:00` });
+  ok(r.status === 201, 'Ganztägiger Termin (ohne Teilnehmer → Ersteller)');
+  r = await call('GET', `/team-calendar?start=${wk}&end=${wk}`);
+  const ev = r.data.items.find((x) => x.event_id === evId);
+  ok(r.status === 200 && ev && ev.user_ids.includes(maxId) && r.data.users.length >= 2 && r.data.users[0].color, 'Kalender liefert Termin mit Teilnehmern und Farben');
+  ok(r.data.items.some((x) => x.title === 'Urlaub' && x.user_ids.length === 1), 'Ersteller wird automatisch Teilnehmer');
+  r = await call('PATCH', `/team-events/${evId}`, { title: 'Shooting Anna (verschoben)', attendee_ids: [maxId, adminId] });
+  ok(r.status === 200, 'Termin bearbeitet');
+  r = await call('GET', `/team-calendar?start=${wk}&end=${wk}`);
+  ok(r.data.items.find((x) => x.event_id === evId).user_ids.length === 2, 'Mehrere Teilnehmer gespeichert');
+  r = await call('GET', '/team-calendar?start=2026-01-01&end=2026-12-31');
+  ok(r.status === 422, 'Zu großer Zeitraum abgelehnt');
+  r = await call('DELETE', `/team-events/${evId}`);
+  ok(r.status === 200, 'Termin gelöscht');
+  cookie = creatorC;
+  r = await call('GET', `/team-calendar?start=${wk}&end=${wk}`);
+  ok(r.status === 403 || r.status === 401, 'Creator sieht Team-Kalender nicht');
+  cookie = adminC;
+}
 
 console.log('Archivieren & Löschen');
 r = await call('PATCH', `/creators/${tom}`, { status: 'Archiviert' });

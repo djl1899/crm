@@ -467,6 +467,31 @@ const MIGRATIONS = [
     )`,
     `create index if not exists list_contacts_idx on list_contacts (list_id)`,
   ],
+  // 10: Team-Kalender – Termine fürs Team, mehrere Teilnehmer pro Termin
+  [
+    `create table if not exists team_events (
+      id serial primary key,
+      title text not null,
+      kind text not null default 'Termin',
+      starts_at timestamptz not null,
+      ends_at timestamptz not null,
+      all_day boolean not null default false,
+      location text,
+      notes text,
+      creator_id integer references creators(id) on delete set null,
+      collaboration_id integer references collaborations(id) on delete set null,
+      created_by integer references users(id) on delete set null,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )`,
+    `create index if not exists team_events_range_idx on team_events (starts_at, ends_at)`,
+    `create table if not exists team_event_attendees (
+      event_id integer not null references team_events(id) on delete cascade,
+      user_id integer not null references users(id) on delete cascade,
+      primary key (event_id, user_id)
+    )`,
+    `create index if not exists team_event_attendees_user_idx on team_event_attendees (user_id)`,
+  ],
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

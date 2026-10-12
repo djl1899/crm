@@ -174,3 +174,8 @@ export const SHOE_SIZES = Array.from({ length: 29 }, (_, i) => {
   const n = 35 + i / 2;
   return Number.isInteger(n) ? String(n) : `${Math.floor(n)},5`;
 });
+
+// Team-Kalender
+export const TEAM_EVENT_KINDS = ['Termin', 'Meeting', 'Shooting', 'Auftrag', 'Deadline', 'Blocker', 'Sonstiges'];
+// Farben je Person (Reihenfolge = Reihenfolge der Benutzer)
+export const PERSON_COLORS = ['#4f46e5', '#0d9488', '#ea580c', '#db2777', '#2563eb', '#65a30d', '#9333ea', '#ca8a04', '#0891b2', '#dc2626'];
