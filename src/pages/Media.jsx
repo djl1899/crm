@@ -9,7 +9,8 @@ import {
 } from '../components/ui.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { UserSelect, CreatorPicker } from '../components/forms.jsx';
-import { fmtMoney, fmtDate, fmtDue, fmtDateTime, toLocalInput } from '../lib/format.js';
+import { DateTimeRange, rangeToParts, partsToRange } from '../components/DateTimeRange.jsx';
+import { fmtMoney, fmtDate, fmtDue, fmtDateTime } from '../lib/format.js';
 import { MEDIA_STATUSES, MEDIA_TYPES, INVOICE_STATUSES } from '../../shared/constants.js';
 
 const TONES = {
@@ -18,11 +19,16 @@ const TONES = {
 };
 const MediaStatus = ({ value }) => <Badge tone={TONES[value] || 'gray'} dot>{value}</Badge>;
 
-const fmtShoot = (iso) => {
+// "Mi., 14.10.2026, 10:00–16:00 Uhr" oder über mehrere Tage "Mi., 14.10., 10:00 – Fr., 16.10.2026, 18:00 Uhr"
+const fmtShoot = (iso, endIso) => {
   if (!iso) return '–';
   const d = new Date(iso);
-  return d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) + ', ' +
-    d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + ' Uhr';
+  const t = (x) => x.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  const day = (x, year = true) => x.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', ...(year ? { year: 'numeric' } : {}) });
+  if (!endIso) return `${day(d)}, ${t(d)} Uhr`;
+  const e = new Date(endIso);
+  if (d.toDateString() === e.toDateString()) return `${day(d)}, ${t(d)}–${t(e)} Uhr`;
+  return `${day(d, false)}, ${t(d)} – ${day(e)}, ${t(e)} Uhr`;
 };
 const shootDay = (iso) => {
   if (!iso) return null;
@@ -89,7 +95,7 @@ export function MediaPage() {
                       <span className={`due-pill ${due === 'heute' ? 'today' : ''}`}>{due}</span>
                       <div className="list-main">
                         <div className="list-title">{m.client_name} – {m.title}</div>
-                        <div className="list-sub">{fmtShoot(m.shoot_at)}{m.shoot_location ? ` · ${m.shoot_location}` : ''}{m.assignee_name ? ` · ${m.assignee_name}` : ''}</div>
+                        <div className="list-sub">{fmtShoot(m.shoot_at, m.shoot_end_at)}{m.shoot_location ? ` · ${m.shoot_location}` : ''}{m.assignee_name ? ` · ${m.assignee_name}` : ''}</div>
                       </div>
                       <MediaStatus value={m.status} />
                     </button>
@@ -162,7 +168,7 @@ export function MediaPage() {
                       <div className="cell-sub muted">{m.title}{m.creator_name ? ` · ${m.creator_name}` : ''}</div>
                     </td>
                     <td className="clip">{m.project_type || <span className="muted">–</span>}</td>
-                    <td className="nowrap">{m.shoot_at ? fmtShoot(m.shoot_at) : <span className="muted">offen</span>}{m.shoot_location && <div className="cell-sub muted">{m.shoot_location}</div>}</td>
+                    <td className="nowrap">{m.shoot_at ? fmtShoot(m.shoot_at, m.shoot_end_at) : <span className="muted">offen</span>}{m.shoot_location && <div className="cell-sub muted">{m.shoot_location}</div>}</td>
                     <td className="nowrap">
                       {m.delivery_date ? <span className={m.delivery_overdue ? 'tone-red strong' : ''}>{fmtDate(m.delivery_date)}</span> : <span className="muted">–</span>}
                       {m.delivery_date && m.is_open && m.status !== 'Geliefert' && <div className={`cell-sub ${m.delivery_overdue ? 'tone-red' : 'muted'}`}>{fmtDue(m.delivery_date)}</div>}
@@ -196,7 +202,7 @@ function MediaModal({ open, item, onClose }) {
     f.setErrors({});
     f.setValues({
       client_name: m.client_name || '', title: m.title || '', project_type: m.project_type || '', status: m.status || 'Anfrage',
-      shoot_at: m.shoot_at ? toLocalInput(m.shoot_at) : '', shoot_location: m.shoot_location || '', delivery_date: m.delivery_date || '',
+      shoot: rangeToParts(m.shoot_at, m.shoot_end_at, { defaultMinutes: 120 }), shoot_location: m.shoot_location || '', delivery_date: m.delivery_date || '',
       deliverables: m.deliverables || '', price: m.price ?? '', invoice_status: m.invoice_status || 'Nicht erstellt',
       contact_name: m.contact_name || '', contact_email: m.contact_email || '', contact_phone: m.contact_phone || '',
       assignee_id: m.id ? (m.assignee_id ? String(m.assignee_id) : '') : String(user.id),
@@ -208,8 +214,11 @@ function MediaModal({ open, item, onClose }) {
   const submit = async (e) => {
     e.preventDefault();
     setSaving(true);
-    const { creator_label, ...payload } = v;
-    payload.shoot_at = v.shoot_at ? new Date(v.shoot_at).toISOString() : null;
+    const { creator_label, shoot, ...payload } = v;
+    const r = partsToRange(shoot);
+    if (r.error) { setSaving(false); return f.setErrors({ shoot_end_at: r.error }); }
+    payload.shoot_at = r.start;
+    payload.shoot_end_at = r.end;
     try {
       if (item) await api.patch(`/media/${item.id}`, payload);
       else await api.post('/media', payload);
@@ -266,9 +275,8 @@ function MediaModal({ open, item, onClose }) {
         </Field>
 
         <div className="form-section span-2">Dreh & Abgabe</div>
-        <Field label="Nächster Drehtermin" error={f.errors.shoot_at}>
-          <input className="input" type="datetime-local" value={v.shoot_at || ''} onChange={f.set('shoot_at')} />
-        </Field>
+        <DateTimeRange value={v.shoot} onChange={(shoot) => { f.setValues((x) => ({ ...x, shoot })); f.setErrors({}); }} defaultMinutes={120}
+          labels={{ start: 'Drehbeginn', end: 'Drehende' }} errors={{ start: f.errors.shoot_at, end: f.errors.shoot_end_at }} />
         <Field label="Drehort" error={f.errors.shoot_location}>
           <input className="input" value={v.shoot_location || ''} onChange={f.set('shoot_location')} placeholder="Adresse oder Location" />
         </Field>

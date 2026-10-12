@@ -69,11 +69,11 @@ export default function register(route) {
     for (const t of tasks) items.push({ id: `t${t.id}`, source: 'task', kind: 'Aufgabe', title: t.title + (t.creator_name ? ` · ${t.creator_name}` : ''), date: dstr(t.due_date), all_day: true, user_ids: t.assignee_id ? [t.assignee_id] : [], link: `/tasks?open=${t.id}`, priority: t.priority });
     // 3) Media-Produktion: Shooting (mit Uhrzeit) und Abgabe
     const media = await q(
-      `select id, title, client_name, shoot_at, shoot_location, delivery_date, assignee_id,
-         (shoot_at >= ($1::date::timestamp at time zone '${TZ}') and shoot_at < (($2::date + 1)::timestamp at time zone '${TZ}')) as shoot_in
+      `select id, title, client_name, shoot_at, coalesce(shoot_end_at, shoot_at + interval '2 hours') as shoot_end, shoot_location, delivery_date, assignee_id,
+         (shoot_at < (($2::date + 1)::timestamp at time zone '${TZ}') and coalesce(shoot_end_at, shoot_at + interval '2 hours') > ($1::date::timestamp at time zone '${TZ}')) as shoot_in
        from media_projects
        where status <> all($3::text[]) and (
-         (shoot_at >= ($1::date::timestamp at time zone '${TZ}') and shoot_at < (($2::date + 1)::timestamp at time zone '${TZ}'))
+         (shoot_at < (($2::date + 1)::timestamp at time zone '${TZ}') and coalesce(shoot_end_at, shoot_at + interval '2 hours') > ($1::date::timestamp at time zone '${TZ}'))
          or delivery_date between $1 and $2)`,
       [start, end, MEDIA_CLOSED_STATUSES]
     );
@@ -81,7 +81,7 @@ export default function register(route) {
       const uids = m.assignee_id ? [m.assignee_id] : [];
       const s = m.shoot_at ? new Date(m.shoot_at) : null;
       if (s && m.shoot_in) {
-        items.push({ id: `ms${m.id}`, source: 'media', kind: 'Shooting', title: `Shooting: ${m.title} (${m.client_name})`, start: s.toISOString(), end: new Date(s.getTime() + 2 * 3600e3).toISOString(), all_day: false, location: m.shoot_location, user_ids: uids, link: `/media?open=${m.id}` });
+        items.push({ id: `ms${m.id}`, source: 'media', kind: 'Shooting', title: `Shooting: ${m.title} (${m.client_name})`, start: s.toISOString(), end: new Date(m.shoot_end).toISOString(), all_day: false, location: m.shoot_location, user_ids: uids, link: `/media?open=${m.id}` });
       }
       const dd = dstr(m.delivery_date);
       if (dd && dd >= start && dd <= end) items.push({ id: `md${m.id}`, source: 'media', kind: 'Abgabe', title: `Abgabe: ${m.title} (${m.client_name})`, date: dd, all_day: true, user_ids: uids, link: `/media?open=${m.id}` });

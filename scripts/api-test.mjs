@@ -492,6 +492,24 @@ cookie = adminC;
   ok(r.status === 200, 'Termin bearbeitet');
   r = await call('GET', `/team-calendar?start=${wk}&end=${wk}`);
   ok(r.data.items.find((x) => x.event_id === evId).user_ids.length === 2, 'Mehrere Teilnehmer gespeichert');
+  // Mehrtägiger Termin mit Uhrzeiten
+  const d2 = new Date(Date.parse(wk) + 2 * 864e5).toISOString().slice(0, 10);
+  r = await call('POST', '/team-events', { title: 'Messe', starts_at: `${wk}T08:00:00+02:00`, ends_at: `${d2}T18:30:00+02:00` });
+  ok(r.status === 201, 'Termin über mehrere Tage mit Start- und Enduhrzeit');
+  r = await call('GET', `/team-calendar?start=${d2}&end=${d2}`);
+  ok(r.data.items.some((x) => x.title === 'Messe' && !x.all_day), 'Mehrtägiger Termin erscheint auch am letzten Tag');
+  // Media-Dreh mit Ende
+  r = await call('POST', '/media', { client_name: 'Kunde X', title: 'Imagefilm', shoot_at: `${wk}T09:00:00+02:00`, shoot_end_at: `${wk}T17:30:00+02:00`, assignee_id: adminId });
+  ok(r.status === 201, 'Media-Projekt mit Drehbeginn und -ende');
+  const mId = r.data.id;
+  r = await call('GET', `/team-calendar?start=${wk}&end=${wk}`);
+  const sh = r.data.items.find((x) => x.id === `ms${mId}`);
+  ok(sh && (Date.parse(sh.end) - Date.parse(sh.start)) === 8.5 * 3600e3, 'Dreh erscheint im Kalender mit echter Dauer (8,5 Std.)');
+  r = await call('PATCH', `/media/${mId}`, { shoot_end_at: `${wk}T08:00:00+02:00` });
+  ok(r.status === 422, 'Drehende vor Drehbeginn abgelehnt');
+  r = await call('POST', '/media', { client_name: 'Kunde Y', title: 'Ohne Ende', shoot_at: `${wk}T10:00:00+02:00` });
+  r = await call('GET', `/media/${r.data.id}`);
+  ok(Date.parse(r.data.project.shoot_end_at) - Date.parse(r.data.project.shoot_at) === 2 * 3600e3, 'Ohne Ende: Standard 2 Stunden');
   r = await call('GET', '/team-calendar?start=2026-01-01&end=2026-12-31');
   ok(r.status === 422, 'Zu großer Zeitraum abgelehnt');
   r = await call('DELETE', `/team-events/${evId}`);

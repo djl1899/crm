@@ -7,6 +7,7 @@ import { useNavigate } from '../lib/router.jsx';
 import { Button, Field, Select, Modal, Segmented, Spinner, ErrorBox, useUi, handleFormError } from '../components/ui.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { CreatorPicker } from '../components/forms.jsx';
+import { DateTimeRange, rangeToParts, partsToRange } from '../components/DateTimeRange.jsx';
 import { TEAM_EVENT_KINDS } from '../../shared/constants.js';
 
 const HOUR_PX = 48;
@@ -302,12 +303,9 @@ function EventModal({ event, users, onClose }) {
   useEffect(() => {
     if (!event) return;
     setErrors({});
-    const s = new Date(event.start);
-    const e = new Date(event.end);
-    const lastDay = event.all_day ? new Date(e.getTime() - 1) : e;
     setV({
       title: event.title || '', kind: event.kind || 'Termin', all_day: !!event.all_day,
-      date: ymd(s), start_time: hm(s), end_date: ymd(lastDay), end_time: hm(e),
+      when: rangeToParts(event.start, event.end, { allDay: !!event.all_day }),
       location: event.location || '', notes: event.notes || '', attendee_ids: event.user_ids || [],
       creator_id: event.creator_id || null, creator_label: event.creator_name || '',
     });
@@ -317,20 +315,11 @@ function EventModal({ event, users, onClose }) {
 
   const save = async (ev) => {
     ev.preventDefault();
-    let starts, ends;
-    if (v.all_day) {
-      starts = parseDate(v.date);
-      ends = addDays(parseDate(v.end_date || v.date), 1);
-    } else {
-      const [sh, sm] = v.start_time.split(':').map(Number);
-      const [eh, em] = v.end_time.split(':').map(Number);
-      starts = parseDate(v.date); starts.setHours(sh, sm);
-      ends = parseDate(v.end_date || v.date); ends.setHours(eh, em);
-    }
-    if (ends < starts) return setErrors({ end_time: 'Ende liegt vor dem Beginn.' });
+    const r = partsToRange(v.when, { allDay: v.all_day });
+    if (r.error || !r.start) return setErrors({ end: r.error || 'Bitte einen Beginn angeben.' });
     setSaving(true);
     try {
-      const body = { title: v.title, kind: v.kind, all_day: v.all_day, starts_at: starts.toISOString(), ends_at: ends.toISOString(), location: v.location, notes: v.notes, attendee_ids: v.attendee_ids, creator_id: v.creator_id || null };
+      const body = { title: v.title, kind: v.kind, all_day: v.all_day, starts_at: r.start, ends_at: r.end, location: v.location, notes: v.notes, attendee_ids: v.attendee_ids, creator_id: v.creator_id || null };
       if (isEdit) await api.patch(`/team-events/${event.event_id}`, body);
       else await api.post('/team-events', body);
       invalidateAll();
@@ -352,20 +341,6 @@ function EventModal({ event, users, onClose }) {
       toast(err.message, 'error');
     }
   };
-  // Ende automatisch mitschieben, wenn der Beginn geändert wird
-  const setStart = (e) => {
-    const val = e.target.value;
-    setV((x) => {
-      const [h, m] = val.split(':').map(Number);
-      const [oh, om] = x.start_time.split(':').map(Number);
-      const [eh, em] = x.end_time.split(':').map(Number);
-      const dur = eh * 60 + em - (oh * 60 + om);
-      const end = Math.min(23 * 60 + 59, h * 60 + m + Math.max(dur, 15));
-      return { ...x, start_time: val, end_time: `${pad(Math.floor(end / 60))}:${pad(end % 60)}` };
-    });
-  };
-  const setDate = (e) => { const val = e.target.value; setV((x) => ({ ...x, date: val, end_date: x.end_date < val || x.end_date === x.date ? val : x.end_date })); };
-
   return (
     <Modal open={!!event} onClose={onClose} title={isEdit ? 'Termin bearbeiten' : 'Neuer Termin'} size="lg"
       footer={<>
@@ -379,15 +354,8 @@ function EventModal({ event, users, onClose }) {
         </Field>
         <Field label="Art" error={errors.kind}><Select value={v.kind} onChange={set('kind')} options={TEAM_EVENT_KINDS} /></Field>
         <Field label=" "><label className="checkline"><input type="checkbox" checked={!!v.all_day} onChange={set('all_day')} /> Ganztägig</label></Field>
-        <Field label="Datum" required error={errors.starts_at}><input className="input" type="date" value={v.date || ''} onChange={setDate} /></Field>
-        {v.all_day ? (
-          <Field label="Bis einschließlich" error={errors.ends_at}><input className="input" type="date" value={v.end_date || ''} min={v.date} onChange={set('end_date')} /></Field>
-        ) : (
-          <div className="row tcal-times">
-            <Field label="Von"><input className="input" type="time" step="900" value={v.start_time || ''} onChange={setStart} /></Field>
-            <Field label="Bis" error={errors.end_time || errors.ends_at}><input className="input" type="time" step="900" value={v.end_time || ''} onChange={set('end_time')} /></Field>
-          </div>
-        )}
+        <DateTimeRange value={v.when} onChange={(when) => { setV((x) => ({ ...x, when })); setErrors({}); }} allDay={!!v.all_day} required
+          errors={{ start: errors.starts_at, end: errors.end || errors.ends_at }} labels={v.all_day ? { start: 'Erster Tag', end: 'Letzter Tag' } : {}} />
         <Field label="Für wen?" className="span-2" error={errors.attendee_ids} hint="Erscheint im Kalender aller ausgewählten Personen.">
           <div className="tcal-att">
             {users.map((u) => (

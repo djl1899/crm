@@ -11,7 +11,8 @@ const schema = {
   title: v.str({ label: 'Projekt', required: true, max: 200 }),
   project_type: v.str({ label: 'Art', max: 80 }),
   status: v.oneOf(MEDIA_STATUSES, { label: 'Status', def: 'Anfrage' }),
-  shoot_at: v.datetime({ label: 'Drehtermin' }),
+  shoot_at: v.datetime({ label: 'Drehbeginn' }),
+  shoot_end_at: v.datetime({ label: 'Drehende' }),
   shoot_location: v.str({ label: 'Drehort', max: 200 }),
   delivery_date: v.date({ label: 'Abgabetermin' }),
   deliverables: v.str({ label: 'Leistungen', max: 5000 }),
@@ -36,6 +37,17 @@ const SELECT = `
 async function checkRefs(d) {
   if (d.assignee_id && !(await one(`select id from users where id = $1 and role <> 'creator'`, [d.assignee_id]))) throw new HttpError(422, 'Benutzer nicht gefunden.', { assignee_id: 'Ungültig.' });
   if (d.creator_id && !(await one(`select id from creators where id = $1`, [d.creator_id]))) throw new HttpError(422, 'Creator nicht gefunden.', { creator_id: 'Ungültig.' });
+}
+
+// Drehende prüfen: nicht vor dem Beginn; ohne Beginn kein Ende; ohne Ende = Beginn + 2 Std.
+function normalizeShoot(data, before = {}) {
+  if (!('shoot_at' in data) && !('shoot_end_at' in data)) return;
+  const start = 'shoot_at' in data ? data.shoot_at : before.shoot_at ? new Date(before.shoot_at).toISOString() : null;
+  let end = 'shoot_end_at' in data ? data.shoot_end_at : before.shoot_end_at ? new Date(before.shoot_end_at).toISOString() : null;
+  if (!start) { data.shoot_at = null; data.shoot_end_at = null; return; }
+  if (!end) end = new Date(new Date(start).getTime() + 2 * 3600e3).toISOString();
+  if (new Date(end) < new Date(start)) throw new HttpError(422, 'Das Drehende liegt vor dem Drehbeginn.', { shoot_end_at: 'Ende vor Beginn.' });
+  data.shoot_end_at = end;
 }
 
 export default function register(route) {
@@ -94,6 +106,7 @@ export default function register(route) {
   route('POST', '/media', async ({ req, user }) => {
     const data = validate(await readJson(req), schema);
     if (data.price === null) data.price = 0;
+    normalizeShoot(data);
     await checkRefs(data);
     const keys = Object.keys(data);
     const row = await one(
@@ -111,6 +124,7 @@ export default function register(route) {
     if ('price' in data && data.price === null) data.price = 0;
     const before = await one(`select * from media_projects where id = $1`, [id]);
     if (!before) throw new HttpError(404, 'Projekt nicht gefunden.');
+    normalizeShoot(data, before);
     await checkRefs(data);
     const keys = Object.keys(data);
     if (keys.length) {

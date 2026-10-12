@@ -21,7 +21,7 @@ export async function collectDigest(userId) {
        from tasks t left join creators c on c.id = t.creator_id
        where t.status in (${list(OPEN_TASK_STATUSES)}) and t.due_date <= ${TODAY} and t.assignee_id = $1
        order by t.due_date, array_position(array['Dringend','Hoch','Normal','Niedrig']::text[], t.priority) limit 30`, [userId]),
-    q(`select m.id, m.client_name, m.title, m.shoot_at, m.shoot_location,
+    q(`select m.id, m.client_name, m.title, m.shoot_at, m.shoot_end_at, m.shoot_location,
          ((m.shoot_at at time zone 'Europe/Berlin')::date = ${TODAY}) as today
        from media_projects m
        where m.status not in (${list(MEDIA_CLOSED_STATUSES)}) and (m.assignee_id = $1 or m.assignee_id is null)
@@ -69,8 +69,8 @@ export async function buildDigestMail(user, data) {
     text: `${t.title}${t.display_name ? ' (' + t.display_name + ')' : ''} – ${t.overdue ? 'fällig seit ' + dateDe(t.due_date) : 'heute fällig'}`,
   })));
   add('Drehs heute & morgen', data.shoots.map((m) => ({
-    html: `<strong>${m.today ? 'Heute' : 'Morgen'} ${timeDe(m.shoot_at)} Uhr</strong> – ${link(`/media?open=${m.id}`, `${m.client_name}: ${m.title}`)}${m.shoot_location ? ` · ${esc(m.shoot_location)}` : ''}`,
-    text: `${m.today ? 'Heute' : 'Morgen'} ${timeDe(m.shoot_at)} Uhr – ${m.client_name}: ${m.title}${m.shoot_location ? ' · ' + m.shoot_location : ''}`,
+    html: `<strong>${m.today ? 'Heute' : 'Morgen'} ${timeDe(m.shoot_at)}${m.shoot_end_at ? '–' + timeDe(m.shoot_end_at) : ''} Uhr</strong> – ${link(`/media?open=${m.id}`, `${m.client_name}: ${m.title}`)}${m.shoot_location ? ` · ${esc(m.shoot_location)}` : ''}`,
+    text: `${m.today ? 'Heute' : 'Morgen'} ${timeDe(m.shoot_at)}${m.shoot_end_at ? '–' + timeDe(m.shoot_end_at) : ''} Uhr – ${m.client_name}: ${m.title}${m.shoot_location ? ' · ' + m.shoot_location : ''}`,
   })));
   add('Media-Abgaben', data.deliveries.map((m) => ({
     html: `${link(`/media?open=${m.id}`, `${m.client_name}: ${m.title}`)} – ${m.overdue ? red(`überfällig seit ${dateDe(m.delivery_date)}`) : `bis ${dateDe(m.delivery_date)}`}`,

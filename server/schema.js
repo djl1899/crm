@@ -499,6 +499,11 @@ const MIGRATIONS = [
     `update tasks set status = 'Erledigt', completed_at = coalesce(completed_at, updated_at) where status = 'Abgebrochen'`,
     `update tasks set status = 'Offen' where status not in ('Offen', 'In Bearbeitung', 'Erledigt')`,
   ],
+  // 12: Media-Produktion – Dreh mit Ende (Datum + Uhrzeit), auch über mehrere Tage
+  [
+    `alter table media_projects add column if not exists shoot_end_at timestamptz`,
+    `update media_projects set shoot_end_at = shoot_at + interval '2 hours' where shoot_at is not null and shoot_end_at is null`,
+  ],
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;
