@@ -78,6 +78,7 @@ export function MapPage() {
   const [showAllCats, setShowAllCats] = useState(false);
   const [moreFilters, setMoreFilters] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [listTab, setListTab] = useState('view');
   const fitted = useRef(false);
 
   const type = params.get('typ') || 'all';
@@ -127,7 +128,8 @@ export function MapPage() {
 
   const inView = useMemo(() => {
     if (!bounds) return located;
-    return located.filter((it) => it.lat <= bounds.north && it.lat >= bounds.south && it.lng >= bounds.west && it.lng <= bounds.east);
+    return located.filter((it) => it.lat <= bounds.north && it.lat >= bounds.south && it.lng >= bounds.west && it.lng <= bounds.east)
+      .sort((x, y) => x.title.localeCompare(y.title, 'de'));
   }, [located, bounds]);
 
   const toggleCat = (c) => setParams({ kat: (cats.includes(c) ? cats.filter((x) => x !== c) : [...cats, c]).join(',') || null });
@@ -164,7 +166,7 @@ export function MapPage() {
   };
 
   const onViewChange = useCallback((b) => setBounds(b), []);
-  const shownCats = showAllCats ? catCounts : catCounts.slice(0, 10);
+  const shownCats = showAllCats ? catCounts : catCounts.slice(0, 8);
 
   return (
     <div className="mapx">
@@ -182,85 +184,93 @@ export function MapPage() {
           </div>
         )}
 
-        <div className="mapx-types" role="radiogroup" aria-label="Was anzeigen?">
-          {TYPES.map((t) => (
-            <button key={t.value} type="button" role="radio" aria-checked={type === t.value} className={type === t.value ? 'on' : ''}
-              onClick={() => setParams({ typ: t.value === 'all' ? null : t.value, liste: t.value === 'creator' ? null : listId || null, status: t.value === 'firm' ? null : status || null })}>
-              {t.value === 'creator' && <span className="lg-shape lg-circle" />}
-              {t.value === 'firm' && <span className="lg-shape lg-square" />}
-              {t.label}<span className="mapx-count">{typeCounts[t.value]}</span>
-            </button>
-          ))}
-        </div>
-
-        <label className="mapx-search">
-          <Icon name="search" size={16} />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Name, Ort, Branche …" aria-label="Auf der Karte suchen" />
-        </label>
-
-        <section className="mapx-section">
-          <div className="mapx-section-head">
-            <h2>Kategorien</h2>
-            {cats.length > 0 && <button type="button" className="link small" onClick={() => setParams({ kat: null })}>Alle zeigen</button>}
+        <div className="mapx-filters">
+          <div className="mapx-types" role="radiogroup" aria-label="Was anzeigen?">
+            {TYPES.map((t) => (
+              <button key={t.value} type="button" role="radio" aria-checked={type === t.value} className={type === t.value ? 'on' : ''}
+                onClick={() => setParams({ typ: t.value === 'all' ? null : t.value, liste: t.value === 'creator' ? null : listId || null, status: t.value === 'firm' ? null : status || null })}>
+                {t.value === 'creator' && <span className="lg-shape lg-circle" />}
+                {t.value === 'firm' && <span className="lg-shape lg-square" />}
+                {t.label}<span className="mapx-count">{typeCounts[t.value]}</span>
+              </button>
+            ))}
           </div>
-          {!catCounts.length ? <p className="small muted">Noch keine Kategorien – bei Creatorn über die Nische, bei Firmen über das Feld „Kategorie“ in der Liste.</p> : (
-            <div className="mapx-cats">
-              {shownCats.map(([c, n]) => (
-                <button key={c} type="button" className={`mapx-cat ${cats.includes(c) ? 'on' : ''}`} style={{ '--c': categoryColor(c) }} aria-pressed={cats.includes(c)} onClick={() => toggleCat(c)}>
-                  <span className="mapx-cat-dot" />{c}<span className="mapx-count">{n}</span>
-                </button>
-              ))}
-              {catCounts.length > 10 && <button type="button" className="link small" onClick={() => setShowAllCats(!showAllCats)}>{showAllCats ? 'Weniger' : `${catCounts.length - 10} weitere`}</button>}
-            </div>
-          )}
-        </section>
 
-        <section className="mapx-section">
-          <button type="button" className="mapx-more" aria-expanded={moreFilters} onClick={() => setMoreFilters(!moreFilters)}>
-            <Icon name={moreFilters ? 'chevronUp' : 'chevronDown'} size={15} /> Weitere Filter{(status || listId || archived) ? ' (aktiv)' : ''}
-          </button>
-          {moreFilters && (
-            <div className="mapx-more-body">
-              {type !== 'firm' && <Select value={status} onChange={(e) => setParams({ status: e.target.value || null })} placeholder="Jeder Creator-Status" options={CREATOR_STATUSES.filter((s) => s !== 'Archiviert')} aria-label="Creator-Status" />}
-              {type !== 'creator' && <Select value={listId} onChange={(e) => setParams({ liste: e.target.value || null })} placeholder="Alle Listen" options={lists} aria-label="Liste" />}
-              <label className="checkline"><input type="checkbox" checked={archived} onChange={(e) => setArchived(e.target.checked)} /> Archivierte Creator zeigen</label>
-            </div>
-          )}
-        </section>
+          <label className="mapx-search">
+            <Icon name="search" size={16} />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Name, Ort, Branche …" aria-label="Auf der Karte suchen" />
+          </label>
 
-        <section className="mapx-section mapx-results">
-          <div className="mapx-section-head">
-            <h2>Im Kartenausschnitt</h2>
-            <span className="mapx-count">{inView.length}</span>
-          </div>
-          {!data ? <Spinner /> : !inView.length ? (
-            <p className="small muted">{filtered.length ? 'Hier ist nichts – verschieb die Karte oder zoom heraus.' : 'Keine Treffer für diese Filter.'}</p>
-          ) : (
-            <ul className="mapx-list">
-              {inView.slice(0, 150).map((it) => <ResultRow key={it.key} it={it} active={it.key === selectedKey} onClick={() => focus(it)} />)}
-              {inView.length > 150 && <li className="small muted mapx-list-more">… und {inView.length - 150} weitere – zoom hinein, um sie zu sehen.</li>}
-            </ul>
-          )}
-        </section>
-
-        {unlocated.length > 0 && (
           <section className="mapx-section">
             <div className="mapx-section-head">
-              <h2>Ohne Ort</h2>
-              <span className="mapx-count">{unlocated.length}</span>
+              <h2>Kategorien</h2>
+              {cats.length > 0 && <button type="button" className="link small" onClick={() => setParams({ kat: null })}>Alle zeigen</button>}
             </div>
-            <p className="small muted">Kein Wohnort bzw. keine Adresse hinterlegt. Trag den Ort ein oder setz den Punkt direkt auf die Karte.</p>
-            <ul className="mapx-list">
-              {unlocated.slice(0, 40).map((it) => (
-                <li key={it.key} className="mapx-row nolink">
-                  <Marker it={it} small />
-                  <div className="mapx-row-main"><div className="mapx-row-title">{it.title}</div><div className="mapx-row-sub">{it.type === 'creator' ? 'Creator' : it.list_name}</div></div>
-                  <button type="button" className="link small" onClick={() => setPick(it)}>Auf Karte setzen</button>
-                </li>
-              ))}
-            </ul>
+            {!catCounts.length ? <p className="small muted">Noch keine Kategorien – bei Creatorn über die Nische, bei Firmen über das Feld „Kategorie“ in der Liste.</p> : (
+              <div className="mapx-cats">
+                {shownCats.map(([c, n]) => (
+                  <button key={c} type="button" className={`mapx-cat ${cats.includes(c) ? 'on' : ''}`} style={{ '--c': categoryColor(c) }} aria-pressed={cats.includes(c)} onClick={() => toggleCat(c)}>
+                    <span className="mapx-cat-dot" />{c}<span className="mapx-count">{n}</span>
+                  </button>
+                ))}
+                {catCounts.length > 8 && <button type="button" className="mapx-cat mapx-cat-more" onClick={() => setShowAllCats(!showAllCats)}>{showAllCats ? 'Weniger' : `+ ${catCounts.length - 8} weitere`}</button>}
+              </div>
+            )}
           </section>
-        )}
+
+          <section className="mapx-section">
+            <button type="button" className="mapx-more" aria-expanded={moreFilters} onClick={() => setMoreFilters(!moreFilters)}>
+              <Icon name={moreFilters ? 'chevronUp' : 'chevronDown'} size={15} /> Weitere Filter{(status || listId || archived) ? ' (aktiv)' : ''}
+            </button>
+            {moreFilters && (
+              <div className="mapx-more-body">
+                {type !== 'firm' && <Select value={status} onChange={(e) => setParams({ status: e.target.value || null })} placeholder="Jeder Creator-Status" options={CREATOR_STATUSES.filter((s) => s !== 'Archiviert')} aria-label="Creator-Status" />}
+                {type !== 'creator' && <Select value={listId} onChange={(e) => setParams({ liste: e.target.value || null })} placeholder="Alle Listen" options={lists} aria-label="Liste" />}
+                <label className="checkline"><input type="checkbox" checked={archived} onChange={(e) => setArchived(e.target.checked)} /> Archivierte Creator zeigen</label>
+              </div>
+            )}
+          </section>
+
+        </div>
+
+        <section className="mapx-results">
+          <div className="mapx-tabs" role="tablist" aria-label="Liste">
+            <button type="button" role="tab" aria-selected={listTab === 'view'} className={listTab === 'view' ? 'on' : ''} onClick={() => setListTab('view')}>
+              Im Kartenausschnitt <span className="mapx-count">{inView.length}</span>
+            </button>
+            {unlocated.length > 0 && (
+              <button type="button" role="tab" aria-selected={listTab === 'missing'} className={listTab === 'missing' ? 'on' : ''} onClick={() => setListTab('missing')}>
+                Ohne Ort <span className="mapx-count">{unlocated.length}</span>
+              </button>
+            )}
+          </div>
+          <div className="mapx-scroll">
+            {listTab === 'missing' && unlocated.length > 0 ? (
+              <>
+                <p className="mapx-hint">Kein Wohnort bzw. keine Adresse hinterlegt. Trag den Ort im Profil ein oder setz den Punkt direkt auf die Karte.</p>
+                <ul className="mapx-list">
+                  {unlocated.slice(0, 80).map((it) => (
+                    <li key={it.key} className="mapx-row nolink">
+                      <Marker it={it} small />
+                      <div className="mapx-row-main">
+                        <div className="mapx-row-title">{it.title}</div>
+                        <div className="mapx-row-sub">{it.type === 'creator' ? 'Creator' : it.list_name}</div>
+                      </div>
+                      <button type="button" className="mapx-row-action" onClick={() => setPick(it)}><Icon name="pin" size={13} /> Setzen</button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : !data ? <Spinner /> : !inView.length ? (
+              <p className="mapx-hint">{filtered.length ? 'Hier ist nichts – verschieb die Karte oder zoom heraus.' : 'Keine Treffer für diese Filter.'}</p>
+            ) : (
+              <ul className="mapx-list">
+                {inView.slice(0, 200).map((it) => <ResultRow key={it.key} it={it} active={it.key === selectedKey} onClick={() => focus(it)} />)}
+                {inView.length > 200 && <li className="mapx-hint">… und {inView.length - 200} weitere – zoom hinein, um sie zu sehen.</li>}
+              </ul>
+            )}
+          </div>
+        </section>
       </aside>
 
       <div className="mapx-map">
@@ -341,15 +351,23 @@ function Cluster({ pts }) {
 }
 
 function ResultRow({ it, active, onClick }) {
+  const isCreator = it.type === 'creator';
   return (
     <li>
       <button type="button" className={`mapx-row ${active ? 'on' : ''}`} onClick={onClick}>
         <Marker it={it} small />
-        <div className="mapx-row-main">
-          <div className="mapx-row-title">{it.title}</div>
-          <div className="mapx-row-sub">{[it.type === 'creator' ? it.categories.slice(0, 2).join(', ') || 'Creator' : it.industry || it.categories[0] || 'Firma', it.city].filter(Boolean).join(' in ')}</div>
-        </div>
-        {it.type === 'creator' && it.followers ? <span className="mapx-row-num">{fmtCompact(it.followers)}</span> : null}
+        <span className="mapx-row-main">
+          <span className="mapx-row-top">
+            <span className="mapx-row-title">{it.title}</span>
+            {isCreator && it.followers ? <span className="mapx-row-num">{fmtCompact(it.followers)}</span> : null}
+          </span>
+          <span className="mapx-row-sub">
+            {it.city && <span className="mapx-row-city"><Icon name="pin" size={11} />{it.city}</span>}
+            {isCreator
+              ? it.categories.slice(0, 2).map((c) => <span key={c} className="mapx-row-cat" style={{ '--c': categoryColor(c) }}><i />{c}</span>)
+              : <span className="mapx-row-ind">{it.industry || it.categories[0] || 'Firma'}</span>}
+          </span>
+        </span>
       </button>
     </li>
   );
