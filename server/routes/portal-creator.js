@@ -169,7 +169,7 @@ async function calendarEvents(creator, from, to) {
   }
   const tasks = await q(
     `select t.id, t.title, t.due_date, co.brand from tasks t left join collaborations co on co.id = t.collaboration_id
-     where t.creator_id = $1 and t.status = 'Wartet auf Creator' and t.due_date between $2 and $3`,
+     where t.creator_id = $1 and t.for_creator and t.status <> 'Erledigt' and t.due_date between $2 and $3`,
     [creator.id, from, to]
   );
   for (const t of tasks) events.push({ id: `t${t.id}`, date: iso(t.due_date), kind: 'Erinnerung', title: t.title + (t.brand ? ` (${t.brand})` : ''), source: 'task', task_id: t.id });
@@ -324,7 +324,7 @@ export default function register(route) {
     const [events, todos, docs, collabs, messages] = await Promise.all([
       calendarEvents(c, today, in21),
       q(`select t.id, t.title, t.description, t.due_date, t.priority, co.brand from tasks t left join collaborations co on co.id = t.collaboration_id
-         where t.creator_id = $1 and t.status = 'Wartet auf Creator' order by t.due_date asc nulls last, t.id limit 10`, [c.id]),
+         where t.creator_id = $1 and t.for_creator and t.status <> 'Erledigt' order by t.due_date asc nulls last, t.id limit 10`, [c.id]),
       q(`select id, category, filename, created_at from documents where creator_id = $1 and visible_to_creator = true order by created_at desc limit 5`, [c.id]),
       loadCollabs(c, `and co.status <> 'Abgebrochen'`),
       q(`select m.id, m.body, m.created_at, co.id as collaboration_id, co.brand, u.name as author, (u.role = 'creator') as mine
@@ -481,9 +481,9 @@ export default function register(route) {
     const ctx = await context(args);
     assertWritable(ctx);
     const id = idParam(args.params.id);
-    const t = await one(`select id, title, creator_id, status from tasks where id = $1`, [id]);
-    if (!t || t.creator_id !== ctx.c.id || t.status !== 'Wartet auf Creator') throw new HttpError(404, 'Aufgabe nicht gefunden.');
-    await q(`update tasks set status = 'In Bearbeitung', updated_at = now() where id = $1`, [id]);
+    const t = await one(`select id, title, creator_id, status, for_creator from tasks where id = $1`, [id]);
+    if (!t || t.creator_id !== ctx.c.id || !t.for_creator || t.status === 'Erledigt') throw new HttpError(404, 'Aufgabe nicht gefunden.');
+    await q(`update tasks set status = 'Erledigt', completed_at = now(), updated_at = now() where id = $1`, [id]);
     await logActivity({ creatorId: ctx.c.id, userId: args.user.id, entityType: 'task', entityId: id, action: 'task_done_by_creator', message: `hat „${t.title}“ als erledigt gemeldet.` });
     return { ok: true };
   });

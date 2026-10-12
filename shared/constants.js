@@ -85,8 +85,9 @@ export const TEMPLATE_PLACEHOLDERS = [
 
 export const INVOICE_STATUSES = ['Nicht erstellt', 'Offen', 'Eingereicht', 'Bezahlt', 'Überfällig'];
 
-export const TASK_STATUSES = ['Offen', 'In Bearbeitung', 'Wartet auf Creator', 'Erledigt', 'Abgebrochen'];
-export const OPEN_TASK_STATUSES = ['Offen', 'In Bearbeitung', 'Wartet auf Creator'];
+// Aufgaben haben genau drei Status. Neue Aufgaben starten mit „Offen“.
+export const TASK_STATUSES = ['Offen', 'In Bearbeitung', 'Erledigt'];
+export const OPEN_TASK_STATUSES = ['Offen', 'In Bearbeitung'];
 export const TASK_PRIORITIES = ['Niedrig', 'Normal', 'Hoch', 'Dringend'];
 
 export const CONTRACT_STATUSES = ['Kein Vertrag', 'In Vorbereitung', 'Zur Unterschrift', 'Aktiv', 'Ausgelaufen', 'Gekündigt'];

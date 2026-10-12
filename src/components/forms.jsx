@@ -497,6 +497,42 @@ export function CollaborationModal({ open, onClose, creator, collaboration, onSa
 }
 
 // ---------- Aufgabe ----------
+// ---------- Aufgaben-Status ----------
+export const TASK_STATUS_TONE = { Offen: 'gray', 'In Bearbeitung': 'amber', Erledigt: 'green' };
+export function TaskStatusBadge({ status }) {
+  return <span className={`badge badge-${TASK_STATUS_TONE[status] || 'gray'}`}><span className="badge-dot" />{status}</span>;
+}
+
+/** Status direkt in der Liste ändern: Badge mit Auswahl, wird sofort gespeichert */
+export function TaskStatusSelect({ task, onChanged }) {
+  const { toast } = useUi();
+  const [value, setValue] = useState(task.status);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => setValue(task.status), [task.status]);
+  const change = async (e) => {
+    const next = e.target.value;
+    const prev = value;
+    setValue(next);
+    setSaving(true);
+    try {
+      await api.patch(`/tasks/${task.id}`, { status: next });
+      onChanged?.(next);
+      invalidateAll();
+    } catch (err) {
+      setValue(prev);
+      toast(err.message, 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <select className={`status-select task-status badge badge-${TASK_STATUS_TONE[value] || 'gray'} ${saving ? 'saving' : ''}`} value={value} onChange={change}
+      onClick={(e) => e.stopPropagation()} aria-label={`Status von „${task.title}“`}>
+      {TASK_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+    </select>
+  );
+}
+
 export function TaskModal({ open, onClose, task, defaults = {} }) {
   const { user } = useAuth();
   const { toast } = useUi();
@@ -512,7 +548,7 @@ export function TaskModal({ open, onClose, task, defaults = {} }) {
       creator_label: t.creator_name || defaults.creator?.display_name || '',
       collaboration_id: t.collaboration_id ? String(t.collaboration_id) : defaults.collaborationId ? String(defaults.collaborationId) : '',
       assignee_id: t.id ? (t.assignee_id ? String(t.assignee_id) : '') : String(user.id),
-      priority: t.priority || 'Normal', status: t.status || 'Offen', due_date: t.due_date || '', notes: t.notes || '',
+      priority: t.priority || 'Normal', status: t.status || 'Offen', due_date: t.due_date || '', notes: t.notes || '', for_creator: !!t.for_creator,
     });
   }, [open]); // eslint-disable-line
 
@@ -568,9 +604,19 @@ export function TaskModal({ open, onClose, task, defaults = {} }) {
         <Field label="Priorität" error={f.errors.priority}>
           <Select value={v.priority} onChange={f.set('priority')} options={TASK_PRIORITIES} />
         </Field>
-        <Field label="Status" error={f.errors.status}>
-          <Select value={v.status} onChange={f.set('status')} options={TASK_STATUSES} />
-        </Field>
+        {task ? (
+          <Field label="Status" error={f.errors.status}>
+            <Select value={v.status} onChange={f.set('status')} options={TASK_STATUSES} />
+          </Field>
+        ) : (
+          <Field label="Status"><div className="input input-static"><TaskStatusBadge status="Offen" /> neue Aufgaben starten offen</div></Field>
+        )}
+        {v.creator_id && (
+          <label className="checkline span-2">
+            <input type="checkbox" checked={!!v.for_creator} onChange={(e) => f.setValues((x) => ({ ...x, for_creator: e.target.checked }))} />
+            Im Creator-Bereich als To-do anzeigen (der Creator kann es dort als erledigt melden)
+          </label>
+        )}
         <Field label="Beschreibung" error={f.errors.description} className="span-2">
           <textarea className="input" rows={3} value={v.description || ''} onChange={f.set('description')} />
         </Field>

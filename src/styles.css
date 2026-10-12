@@ -1003,3 +1003,18 @@ span.cal-chip { cursor: default; }
 }
 .tcal-event.compact .tcal-event-title { -webkit-line-clamp: 1; }
 .tcal-allday .tcal-gutter { font-size: 9.5px; padding-right: 6px; }
+
+/* Aufgaben-Status */
+.task-status.status-select { font-size: 12px; padding: 3px 8px; border-radius: 999px; min-width: 128px; }
+.task-status.saving { opacity: .6; }
+.task-row.done { background: #fafafa; }
+.task-row.done .task-title, .task-row.done .task-meta { opacity: .7; }
+.task-row.done:hover { background: var(--surface-2); }
+.task-row.doing .task-check { border-color: #f59e0b; }
+.input-static { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; background: var(--surface-2); }
+@media (max-width: 560px) {
+  .task-row { flex-wrap: wrap; align-items: flex-start; }
+  .task-row .task-check { margin-top: 2px; }
+  .task-main { flex: 1 1 calc(100% - 40px); }
+  .task-badges { width: 100%; padding-left: 32px; flex-wrap: wrap; }
+}

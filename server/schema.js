@@ -492,6 +492,13 @@ const MIGRATIONS = [
     )`,
     `create index if not exists team_event_attendees_user_idx on team_event_attendees (user_id)`,
   ],
+  // 11: Aufgaben auf drei Status reduziert; "Wartet auf Creator" wird zum Merkmal "für Creator sichtbar"
+  [
+    `alter table tasks add column if not exists for_creator boolean not null default false`,
+    `update tasks set for_creator = true, status = 'Offen' where status = 'Wartet auf Creator'`,
+    `update tasks set status = 'Erledigt', completed_at = coalesce(completed_at, updated_at) where status = 'Abgebrochen'`,
+    `update tasks set status = 'Offen' where status not in ('Offen', 'In Bearbeitung', 'Erledigt')`,
+  ],
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

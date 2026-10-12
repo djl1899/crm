@@ -167,10 +167,10 @@ export async function seedDemoData(adminId) {
 
     for (const [ci, title, prio, status, due, u, co] of TASKS) {
       await run(
-        `insert into tasks (title, creator_id, collaboration_id, assignee_id, priority, status, due_date, completed_at, created_by)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-        [title, ci === null ? null : creatorIds[ci], co === null ? null : collabIds[co], uid(u), prio, status, day(due),
-          status === 'Erledigt' ? ts(due) : null, adminId]
+        `insert into tasks (title, creator_id, collaboration_id, assignee_id, priority, status, due_date, completed_at, created_by, for_creator)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [title, ci === null ? null : creatorIds[ci], co === null ? null : collabIds[co], uid(u), prio, status === 'Wartet auf Creator' ? 'Offen' : status, day(due),
+          status === 'Erledigt' ? ts(due) : null, adminId, status === 'Wartet auf Creator']
       );
     }
 

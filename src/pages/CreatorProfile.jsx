@@ -8,7 +8,7 @@ import {
   useUi, handleFormError,
 } from '../components/ui.jsx';
 import { Icon } from '../components/Icon.jsx';
-import { OutreachModal, CollaborationModal, TaskModal, UploadModal, UserSelect, TagPicker } from '../components/forms.jsx';
+import { OutreachModal, CollaborationModal, TaskModal, UploadModal, UserSelect, TagPicker, TaskStatusSelect } from '../components/forms.jsx';
 import { ActivityFeed } from './Dashboard.jsx';
 import {
   fmtNumber, fmtMoney, fmtDate, fmtDateTime, fmtRelative, fmtDue, fmtPercent, fmtBytes,
@@ -706,24 +706,32 @@ function TasksTab({ creator, open }) {
 
 export function TaskList({ items, onOpen, compact = false, showCreator = false }) {
   const { toast } = useUi();
+  // Sofort umschalten (optimistisch), damit sich die Liste direkt anfühlt
+  const [local, setLocal] = useState({});
+  useEffect(() => setLocal({}), [items]);
+  const statusOf = (t) => local[t.id] || t.status;
   const toggle = async (t, e) => {
     e.stopPropagation();
+    const next = statusOf(t) === 'Erledigt' ? 'Offen' : 'Erledigt';
+    setLocal((x) => ({ ...x, [t.id]: next }));
     try {
-      await api.patch(`/tasks/${t.id}`, { status: t.status === 'Erledigt' ? 'Offen' : 'Erledigt' });
+      await api.patch(`/tasks/${t.id}`, { status: next });
       invalidateAll();
-      if (t.status !== 'Erledigt') toast('Aufgabe erledigt.');
+      if (next === 'Erledigt') toast('Aufgabe erledigt.');
     } catch (err) {
+      setLocal((x) => ({ ...x, [t.id]: t.status }));
       toast(err.message, 'error');
     }
   };
   return (
     <ul className="task-list">
       {items.map((t) => {
-        const done = t.status === 'Erledigt' || t.status === 'Abgebrochen';
+        const status = statusOf(t);
+        const done = status === 'Erledigt';
         return (
-          <li key={t.id} className={`task-row ${done ? 'done' : ''}`} onClick={() => onOpen(t)}>
-            <button className={`task-check ${t.status === 'Erledigt' ? 'on' : ''}`} onClick={(e) => toggle(t, e)} aria-label={t.status === 'Erledigt' ? 'Wieder öffnen' : 'Als erledigt markieren'}>
-              {t.status === 'Erledigt' && <Icon name="check" size={13} strokeWidth={2.5} />}
+          <li key={t.id} className={`task-row ${done ? 'done' : ''} ${status === 'In Bearbeitung' ? 'doing' : ''}`} onClick={() => onOpen(t)}>
+            <button className={`task-check ${done ? 'on' : ''}`} onClick={(e) => toggle(t, e)} aria-label={done ? 'Wieder öffnen' : 'Als erledigt markieren'}>
+              {done && <Icon name="check" size={13} strokeWidth={2.5} />}
             </button>
             <div className="task-main">
               <div className="task-title">{t.title}</div>
@@ -732,11 +740,12 @@ export function TaskList({ items, onOpen, compact = false, showCreator = false }
                 {showCreator && t.creator_name && <span><Icon name="user" size={12} /> {t.creator_name}</span>}
                 {t.collaboration_brand && <span><Icon name="briefcase" size={12} /> {t.collaboration_brand}</span>}
                 {!compact && t.assignee_name && <span>→ {t.assignee_name}</span>}
+                {t.for_creator && <span><Icon name="eye" size={12} /> Creator-To-do</span>}
               </div>
             </div>
             <div className="task-badges">
-              {t.priority !== 'Normal' && <StatusBadge value={t.priority} dot={false} />}
-              {!compact && t.status !== 'Offen' && <StatusBadge value={t.status} />}
+              {t.priority !== 'Normal' && !done && <StatusBadge value={t.priority} dot={false} />}
+              <TaskStatusSelect task={{ ...t, status }} onChanged={(s) => setLocal((x) => ({ ...x, [t.id]: s }))} />
             </div>
           </li>
         );

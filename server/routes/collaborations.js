@@ -48,7 +48,7 @@ const SELECT = `
     f.rate as commission_effective, f.agency_fee, f.payout, c.commission_rate as creator_commission_rate,
     ${TIMEFRAME_SQL} as timeframe,
     (co.status in (${REVENUE_COLLAB_SQL})) as counts_as_revenue,
-    (select count(*)::int from tasks t where t.collaboration_id = co.id and t.status in ('Offen', 'In Bearbeitung', 'Wartet auf Creator')) as open_tasks
+    (select count(*)::int from tasks t where t.collaboration_id = co.id and t.status in ('Offen', 'In Bearbeitung')) as open_tasks
   from collaborations co join creators c on c.id = co.creator_id
   join collab_finance f on f.id = co.id`;
 

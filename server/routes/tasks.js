@@ -15,6 +15,7 @@ const taskSchema = {
   status: v.oneOf(TASK_STATUSES, { label: 'Status', def: 'Offen' }),
   due_date: v.date({ label: 'Fälligkeitsdatum' }),
   notes: v.str({ label: 'Notizen', max: 10000 }),
+  for_creator: v.bool({ label: 'Für Creator sichtbar' }),
 };
 
 const SELECT = `
@@ -44,7 +45,8 @@ async function checkRefs(data, existing = {}) {
 }
 
 export default function register(route) {
-  route('GET', '/tasks', async ({ query, user }) => {
+  // Filter als SQL – optional ohne Status (für die Zähler je Status)
+  function buildFilter(query, user, { withStatus = true } = {}) {
     const params = [];
     const p = (x) => { params.push(x); return `$${params.length}`; };
     const where = [];
@@ -55,8 +57,10 @@ export default function register(route) {
     if (due === 'upcoming') where.push(`t.due_date > ${TODAY}`);
     if (due === 'none') where.push(`t.due_date is null`);
     const status = query.get('status');
-    if (status === 'open') where.push(`t.status in (${OPEN_TASK_SQL})`);
-    else if (TASK_STATUSES.includes(status)) where.push(`t.status = ${p(status)}`);
+    if (withStatus) {
+      if (status === 'open') where.push(`t.status in (${OPEN_TASK_SQL})`);
+      else if (TASK_STATUSES.includes(status)) where.push(`t.status = ${p(status)}`);
+    }
     const assignee = query.get('assignee_id');
     if (assignee === 'me') where.push(`t.assignee_id = ${p(user.id)}`);
     else if (assignee === 'none') where.push(`t.assignee_id is null`);
@@ -69,18 +73,29 @@ export default function register(route) {
       const like = p(`%${s}%`);
       where.push(`(t.title ilike ${like} or t.description ilike ${like} or c.display_name ilike ${like})`);
     }
+    return { sql: where.length ? 'where ' + where.join(' and ') : '', params, p };
+  }
+
+  route('GET', '/tasks', async ({ query, user }) => {
+    const f = buildFilter(query, user);
     const pageSize = intParam(query.get('page_size'), { min: 1, max: 200, def: 50 });
     const page = intParam(query.get('page'), { min: 1, def: 1 });
     const rows = await q(
       `${SELECT.replace('select t.*', 'select count(*) over() as total_count, t.*')}
-       ${where.length ? 'where ' + where.join(' and ') : ''}
-       order by (t.status in (${OPEN_TASK_SQL})) desc, t.due_date asc nulls last,
-         array_position(array['Dringend','Hoch','Normal','Niedrig']::text[], t.priority), t.id desc
-       limit ${p(pageSize)} offset ${p((page - 1) * pageSize)}`,
-      params
+       ${f.sql}
+       order by array_position(array['In Bearbeitung','Offen','Erledigt']::text[], t.status), t.due_date asc nulls last,
+         array_position(array['Dringend','Hoch','Normal','Niedrig']::text[], t.priority), t.completed_at desc nulls last, t.id desc
+       limit ${f.p(pageSize)} offset ${f.p((page - 1) * pageSize)}`,
+      f.params
     );
     const total = rows[0] ? Number(rows[0].total_count) : 0;
-    return { items: rows.map(({ total_count, ...r }) => r), total, page, pages: Math.max(1, Math.ceil(total / pageSize)) };
+    // Anzahl je Status für die Filterleiste (gleiche übrige Filter, ohne Status)
+    const c = buildFilter(query, user, { withStatus: false });
+    const countRows = await q(`select t.status, count(*)::int as n from tasks t left join creators c on c.id = t.creator_id ${c.sql} group by t.status`, c.params);
+    const status_counts = Object.fromEntries(TASK_STATUSES.map((st) => [st, 0]));
+    for (const r of countRows) if (r.status in status_counts) status_counts[r.status] = r.n;
+    status_counts.Alle = countRows.reduce((a, r) => a + r.n, 0);
+    return { items: rows.map(({ total_count, ...r }) => r), total, page, pages: Math.max(1, Math.ceil(total / pageSize)), status_counts };
   });
 
   route('GET', '/tasks/:id', async ({ params }) => {

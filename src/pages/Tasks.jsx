@@ -7,16 +7,23 @@ import { PageHeader, Button, Select, Pagination, Spinner, ErrorBox, Empty, Segme
 import { Icon } from '../components/Icon.jsx';
 import { TaskModal, CreatorPicker } from '../components/forms.jsx';
 import { TaskList } from './CreatorProfile.jsx';
-import { TASK_STATUSES, TASK_PRIORITIES } from '../../shared/constants.js';
+import { TASK_PRIORITIES } from '../../shared/constants.js';
 
-const VIEWS = {
-  open: { status: 'open' },
-  today: { status: 'open', due: 'today' },
-  week: { status: 'open', due: 'week' },
-  overdue: { due: 'overdue' },
-  mine: { status: 'open', assignee_id: 'me' },
-  all: {},
-};
+// Alte Links (?view=…) aus Dashboard & Co. weiter unterstützen
+const LEGACY_VIEWS = { open: { status: 'open' }, today: { due: 'today' }, week: { due: 'week' }, overdue: { due: 'overdue' }, mine: { assignee_id: 'me' } };
+const STATUS_FILTER = [
+  { value: '', label: 'Alle' },
+  { value: 'Offen', label: 'Offen' },
+  { value: 'In Bearbeitung', label: 'In Bearbeitung' },
+  { value: 'Erledigt', label: 'Erledigt' },
+];
+const DUE_OPTIONS = [
+  { value: 'today', label: 'Heute fällig' },
+  { value: 'week', label: 'Diese Woche fällig' },
+  { value: 'overdue', label: 'Überfällig' },
+  { value: 'upcoming', label: 'Später fällig' },
+  { value: 'none', label: 'Ohne Fälligkeit' },
+];
 
 export function TasksPage() {
   const [params, setParams] = useSearchParams();
@@ -25,7 +32,11 @@ export function TasksPage() {
   const [search, setSearch] = useState(params.get('q') || '');
   const debounced = useDebounced(search);
   const [modal, setModal] = useState(null);
-  const view = params.get('view') || 'open';
+  // Alte Ansicht-Links einmalig in die neuen Filter übersetzen
+  useEffect(() => {
+    const legacy = LEGACY_VIEWS[params.get('view')];
+    if (legacy) setParams({ view: null, ...legacy });
+  }, []); // eslint-disable-line
 
   useEffect(() => {
     if ((params.get('q') || '') !== debounced) setParams({ q: debounced, page: null });
@@ -39,13 +50,11 @@ export function TasksPage() {
       .catch((e) => toast(e.message, 'error'));
   }, [openId]); // eslint-disable-line
 
-  const base = VIEWS[view] || VIEWS.open;
-  const query = { ...base };
-  for (const k of ['q', 'assignee_id', 'priority', 'creator_id', 'page']) if (params.get(k)) query[k] = params.get(k);
-  if (params.get('status')) query.status = params.get('status');
+  const query = {};
+  for (const k of ['q', 'status', 'due', 'assignee_id', 'priority', 'creator_id', 'page']) if (params.get(k)) query[k] = params.get(k);
   const { data, error, loading, reload } = useApi('/tasks' + qs({ ...query, page_size: 50 }));
-  const counts = useApi('/dashboard');
-  const k = counts.data?.kpi;
+  const counts = data?.status_counts;
+  const statusValue = params.get('status') === 'open' ? 'open' : params.get('status') || '';
   const setFilter = (key) => (e) => setParams({ [key]: e?.target ? e.target.value : e, page: null });
   const close = () => {
     setModal(null);
@@ -61,15 +70,11 @@ export function TasksPage() {
       <div className="filters card">
         <div className="filter-row">
           <Segmented
-            value={view}
-            onChange={(v) => setParams({ view: v === 'open' ? null : v, status: null, page: null })}
+            value={statusValue}
+            onChange={(v) => setParams({ status: v || null, page: null })}
             options={[
-              { value: 'open', label: 'Offen', count: k?.tasks_open },
-              { value: 'today', label: 'Heute', count: k?.tasks_today },
-              { value: 'week', label: 'Diese Woche' },
-              { value: 'overdue', label: 'Überfällig', count: k?.tasks_overdue },
-              { value: 'mine', label: 'Meine' },
-              { value: 'all', label: 'Alle' },
+              ...STATUS_FILTER.map((o) => ({ ...o, count: counts ? counts[o.value || 'Alle'] : undefined })),
+              ...(statusValue === 'open' ? [{ value: 'open', label: 'Offen + In Bearbeitung' }] : []),
             ]}
           />
         </div>
@@ -78,9 +83,9 @@ export function TasksPage() {
             <Icon name="search" size={16} />
             <input className="input" placeholder="Aufgabe oder Creator suchen…" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
+          <Select value={params.get('due')} onChange={setFilter('due')} placeholder="Jede Fälligkeit" options={DUE_OPTIONS} />
           <Select value={params.get('assignee_id')} onChange={setFilter('assignee_id')} placeholder="Alle Verantwortlichen"
-            options={[{ value: 'none', label: '– nicht zugewiesen –' }, ...users.map((u) => ({ value: String(u.id), label: u.name }))]} />
-          <Select value={params.get('status')} onChange={setFilter('status')} placeholder="Status (Ansicht)" options={TASK_STATUSES} />
+            options={[{ value: 'me', label: 'Meine Aufgaben' }, { value: 'none', label: '– nicht zugewiesen –' }, ...users.map((u) => ({ value: String(u.id), label: u.name }))]} />
           <Select value={params.get('priority')} onChange={setFilter('priority')} placeholder="Alle Prioritäten" options={TASK_PRIORITIES} />
           <div className="filter-creator">
             <CreatorPicker key={params.get('creator_id') || 'none'} value={params.get('creator_id')} initialLabel={params.get('creator_name') || ''}
@@ -91,7 +96,7 @@ export function TasksPage() {
       </div>
       <ErrorBox error={error} onRetry={reload} />
       {!data && loading ? <Spinner /> : data && !data.items.length ? (
-        <div className="card"><Empty icon="check" title="Keine Aufgaben in dieser Ansicht" /></div>
+        <div className="card"><Empty icon="check" title="Keine Aufgaben in dieser Ansicht" text={params.get('status') ? `Keine Aufgaben mit Status „${params.get('status') === 'open' ? 'offen' : params.get('status')}“ – Filter oben anpassen.` : 'Lege mit „Neue Aufgabe“ die erste an.'} /></div>
       ) : data ? (
         <Card padded={false} className={loading ? 'is-loading' : ''}>
           <TaskList items={data.items} showCreator onOpen={(t) => setModal({ item: t })} />
